@@ -184,6 +184,21 @@ MidiRollPlugin::MidiRollPlugin()
 	SetParamInfo( PT_RANDOM_V2, "Random", FF_TYPE_EVENT, false );
 	SetParamInfo( PT_PREVIOUS, "Previous", FF_TYPE_EVENT, false );
 
+	// --- Envelope CC routing ----------------------------------------------
+	// Notes and CC can use different channels: keep the synth on the note
+	// channel and send the envelope CCs to Resolume on another channel.
+	// Element 0 preserves the old behaviour (CC follows Midi Channel).
+	SetOptionParamInfo( PT_CC_CHANNEL, "CC Channel", 17, 0.0f );
+	SetParamElementInfo( PT_CC_CHANNEL, 0, "Same as Midi", 0.0f );
+	for( int i = 0; i < 16; ++i )
+	{
+		const std::string label = "Channel " + std::to_string( i + 1 );
+		SetParamElementInfo( PT_CC_CHANNEL, static_cast< unsigned int >( i + 1 ), label.c_str(), static_cast< float >( i + 1 ) );
+	}
+
+	// Sends a slow 0..127..0 sweep on CC 21..24 for MIDI learn.
+	SetParamInfo( PT_TEST_CC, "Test CC", FF_TYPE_EVENT, false );
+
 	// Seed the constrained randomizer once per instance.
 	rngState_ = static_cast< unsigned int >(
 		std::chrono::steady_clock::now().time_since_epoch().count() ) | 1u;
@@ -449,6 +464,23 @@ FFResult MidiRollPlugin::SetFloatParameter( unsigned int index, float value )
 			RestorePrevious();
 		return FF_SUCCESS;
 
+	case PT_CC_CHANNEL:
+	{
+		const int element = static_cast< int >( std::lround( value ) );
+		ccChannelElement_ = std::clamp( element, 0, 16 );
+		// Force the next frame to resend on the new channel.
+		envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
+		return FF_SUCCESS;
+	}
+
+	case PT_TEST_CC:
+		if( value >= 0.5f )
+		{
+			ccTestRemaining_ = kCcTestSeconds;
+			ccTestElapsed_   = 0.0f;
+		}
+		return FF_SUCCESS;
+
 	case PT_BARS_GEN:
 		generatorBars_ = std::clamp( static_cast< int >( std::lround( value ) ), 1, 8 );
 		return FF_SUCCESS;
@@ -503,6 +535,10 @@ float MidiRollPlugin::GetFloatParameter( unsigned int index )
 	case PT_RANDOM_V2:
 		return 0.0f;
 	case PT_PREVIOUS:
+		return 0.0f;
+	case PT_CC_CHANNEL:
+		return static_cast< float >( ccChannelElement_ );
+	case PT_TEST_CC:
 		return 0.0f;
 	case PT_BARS_GEN:
 		return static_cast< float >( generatorBars_ );
@@ -603,6 +639,7 @@ FFResult MidiRollPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	DriveSequencer( deltaSeconds );
 	FlushNoteOffs( deltaSeconds );
 	envelopes_.Advance( deltaSeconds );
+	UpdateCcTest( deltaSeconds );
 	PushEnvelopeParams();
 	PollBridge( deltaSeconds );
 
@@ -858,6 +895,8 @@ void MidiRollPlugin::StopAll()
 {
 	lastStep_     = -1;
 	pendingCount_ = 0;
+	ccTestRemaining_ = 0.0f;
+	ccTestElapsed_   = 0.0f;
 	midi_.AllNotesOff();
 	envelopes_.Reset();
 	envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
@@ -883,15 +922,54 @@ void MidiRollPlugin::PushEnvelopeParams()
 			RaiseParamEvent( kParamIds[ lane ], FF_EVENT_FLAG_VALUE );
 		}
 
-		if( !midi_.IsOpen() )
+		if( !midi_.IsOpen() || ccTestRemaining_ > 0.0f )
 			continue;
 
 		const int ccValue = static_cast< int >( std::lround( value * 127.0f ) );
 		if( ccValue != envCcSent_[ lane ] )
 		{
 			envCcSent_[ lane ] = ccValue;
-			midi_.ControlChange( midiChannel_, kCcBase + lane, ccValue );
+			midi_.ControlChange( CcChannel(), kCcBase + lane, ccValue );
 		}
+	}
+}
+
+int MidiRollPlugin::CcChannel() const
+{
+	return ccChannelElement_ > 0 ? ccChannelElement_ - 1 : midiChannel_;
+}
+
+void MidiRollPlugin::UpdateCcTest( float deltaSeconds )
+{
+	if( ccTestRemaining_ <= 0.0f )
+		return;
+
+	ccTestRemaining_ = std::max( 0.0f, ccTestRemaining_ - deltaSeconds );
+	ccTestElapsed_ += deltaSeconds;
+
+	if( midi_.IsOpen() )
+	{
+		// 0..127..0 triangle over 1.6 s, each lane a quarter cycle apart. The
+		// first CC (21) is sent first, so MIDI learn grabs Env 1; the other
+		// lanes can be selected by editing the learned CC number.
+		constexpr float kCycle = 1.6f;
+		const float phase   = std::fmod( ccTestElapsed_ / kCycle, 1.0f );
+		const int channel   = CcChannel();
+
+		for( int lane = 0; lane < kLanes; ++lane )
+		{
+			const float shifted  = std::fmod( phase + 0.25f * static_cast< float >( lane ), 1.0f );
+			const float triangle = 1.0f - std::fabs( 2.0f * shifted - 1.0f );
+			const int ccValue    = static_cast< int >( std::lround( triangle * 127.0f ) );
+			midi_.ControlChange( channel, kCcBase + lane, ccValue );
+		}
+	}
+
+	if( ccTestRemaining_ <= 0.0f )
+	{
+		// Hand the CC stream back to the envelopes and force a resend so the
+		// mapped dials snap to the current envelope values.
+		envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
 	}
 }
 
@@ -906,6 +984,9 @@ void MidiRollPlugin::OpenConfiguredPort()
 	}
 
 	midi_.Open( portElement_ - 1 );
+	// A fresh port must receive the current envelope values even if they have
+	// not changed since the last frame.
+	envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
 }
 
 // ---------------------------------------------------------------------------

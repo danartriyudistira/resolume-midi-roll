@@ -230,8 +230,10 @@ bawaan: genre 0 Techno, 1 House, 2 Trance, 3 Drum & Bass, 4 Hip-Hop; template
 `--scale N` (0–5), `--bars N` (1–8), `--progression "A D A G"`, dan
 `--density N` (0–1) menguji nada dasar, scale, panjang, progresi, dan kepadatan.
 Tambahkan `--random` untuk variasi acak terkendali dan `--previous` untuk menguji
-tombol Previous setelah Load/Random. Harness mencetak `Root/Scale`,
-`Bars/Density`, `Progression`, dan `Notes`.
+tombol Previous setelah Load/Random. `--cc-channel N` (0 = sama dengan Midi
+Channel, 1–16 = channel eksplisit) dan `--test-cc` menguji routing CC envelope
+dan sweep MIDI learn. Harness mencetak `Root/Scale`, `Bars/Density`,
+`Progression`, dan `Notes`.
 
 ## Peta parameter
 
@@ -258,13 +260,15 @@ tombol Previous setelah Load/Random. Harness mencetak `Root/Scale`,
 | 21 | Load | event | memuat template + menyimpan snapshot ke history |
 | 22 | Random | event | variasi acak + menyimpan snapshot ke history |
 | 23 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
+| 24 | CC Channel | option | `Same as Midi` atau `Channel 1`–`Channel 16` untuk CC 21–24 |
+| 25 | Test CC | event | sweep CC 21–24 selama 3,2 detik untuk MIDI learn |
 
 ### Panel Resolume
 
 Urutan panel mengikuti alur live: **Midi Port** (dropdown), **Midi Channel**,
 **Decay**, **Edit Mode**, **Env 1..4**, **Pattern**, **Notes**, **Midi Offset**,
 **Root**, **Scale**, **Genre**, **Template**, **Bars**, **Progression**,
-**Density**, **Load**, **Random**, **Previous**.
+**Density**, **Load**, **Random**, **Previous**, **CC Channel**, **Test CC**.
 
 `Load Template` dan `Random` lama (index 16–17) disembunyikan dari panel tetapi
 tetap ada agar preset lama tidak bergeser. Tombol yang dipakai sekarang adalah
@@ -434,6 +438,41 @@ Catatan penting:
 Alur live: putar Genre/Template/Root/Scale/Bars dan Density di Dashboard, tekan
 **Random** di panel sampai pola cocok, **Previous** kalau meleset. Detail note
 diedit di web lewat **Edit Mode**.
+
+### Env sebagai penggerak Dashboard (CC)
+
+Env 1–4 dipancarkan sebagai **MIDI CC 21–24**. Resolume bisa memetakan CC itu ke
+dial Dashboard, lalu parameter lain (mis. warna) di-link ke dial tersebut. Jadi
+Env tidak menjadi dial itu sendiri — Env **menggerakkan** dial lewat MIDI.
+
+```
+Env 1..4 → CC 21..24 (loopMIDI) → MIDI shortcut → Dashboard dial → parameter warna
+```
+
+- **CC Channel** memisahkan channel CC dari channel note. Contoh: note ke synth
+  di `Channel 1`, CC ke Resolume di `Channel 16`. Default `Same as Midi`
+  mempertahankan perilaku lama.
+- **Test CC** mengirim sweep 0→127→0 pada CC 21–24 selama 3,2 detik. Pakai ini
+  saat MIDI learn supaya tidak perlu menunggu note berbunyi.
+- CC hanya dikirim saat nilainya berubah; setelah port/channel diganti, plugin
+  mengirim ulang nilai saat ini.
+
+Langkah mapping:
+
+1. Aktifkan `loopMIDI Port` sebagai MIDI Input di Preferences Resolume.
+2. Di Midi Roll: `Midi Port = loopMIDI Port`, `Midi Channel` untuk note, dan
+   `CC Channel` untuk CC (mis. `Channel 16`).
+3. Masuk MIDI shortcut mode, klik dial Dashboard yang dituju.
+4. Tekan **Test CC**. Resolume menangkap CC 21 (Env 1). Set mode **Absolute**.
+5. Untuk Env 2–4, ubah nomor CC di panel shortcut menjadi 22/23/24.
+6. Drag parameter warna ke dial yang sama: `Hue Rotate`, `Colorize` → `Hue`,
+   atau `Add/Subtract` → `R`/`G`/`B`.
+7. Atur **In/Out**, **Invert**, dan **Dial Range** per parameter.
+8. Simpan **Shortcut Preset** — mapping MIDI tidak ikut tersimpan di `.avc`.
+
+Satu CC yang sama boleh di-map ke beberapa dial sekaligus: dial clip, dial layer,
+dan dial composition. Dengan begitu satu Env bisa memodulasi warna di beberapa
+scope tanpa duplikasi.
 
 **Env mengikuti Fold.** Lane envelope dipetakan dari daftar pitch unik pada
 `Notes`, diurutkan dari nada tertinggi (sama seperti baris Fold di piano roll):
