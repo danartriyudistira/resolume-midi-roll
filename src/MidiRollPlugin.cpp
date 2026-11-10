@@ -199,6 +199,32 @@ MidiRollPlugin::MidiRollPlugin()
 	// Toggles a continuous 0..127..0 sweep on CC 21..24 for MIDI learn.
 	SetParamInfo( PT_TEST_CC, "Test CC", FF_TYPE_EVENT, false );
 
+	// Which envelope the Test CC sweep drives. Mapping one lane at a time makes
+	// the learned CC number predictable: Env 1 -> 21, Env 2 -> 22, and so on.
+	SetOptionParamInfo( PT_TEST_LANE, "Test Lane", 4, 0.0f );
+	SetParamElementInfo( PT_TEST_LANE, 0, "Env 1", 0.0f );
+	SetParamElementInfo( PT_TEST_LANE, 1, "Env 2", 1.0f );
+	SetParamElementInfo( PT_TEST_LANE, 2, "Env 3", 2.0f );
+	SetParamElementInfo( PT_TEST_LANE, 3, "Env 4", 3.0f );
+
+	// --- Dashboard OSC -----------------------------------------------------
+	// Each envelope can drive one composition dashboard dial directly over OSC.
+	// No MIDI learn is needed; Resolume only has to enable OSC input.
+	for( int lane = 0; lane < kLanes; ++lane )
+	{
+		const std::string name = "Env " + std::to_string( lane + 1 ) + " Dial";
+		SetOptionParamInfo( PT_ENV1_DIAL + lane, name.c_str(), 9, 0.0f );
+		SetParamElementInfo( PT_ENV1_DIAL + lane, 0, "Off", 0.0f );
+
+		for( int dial = 0; dial < 8; ++dial )
+		{
+			const std::string label = "Dial " + std::to_string( dial + 1 );
+			SetParamElementInfo( PT_ENV1_DIAL + lane, static_cast< unsigned int >( dial + 1 ), label.c_str(), static_cast< float >( dial + 1 ) );
+		}
+	}
+
+	osc_.Open( 7000 );
+
 	// Seed the constrained randomizer once per instance.
 	rngState_ = static_cast< unsigned int >(
 		std::chrono::steady_clock::now().time_since_epoch().count() ) | 1u;
@@ -212,6 +238,7 @@ MidiRollPlugin::MidiRollPlugin()
 MidiRollPlugin::~MidiRollPlugin()
 {
 	StopAll();
+	osc_.Close();
 	midi_.Close();
 	midiroll::BridgeServer::Instance().Release();
 }
@@ -484,6 +511,22 @@ FFResult MidiRollPlugin::SetFloatParameter( unsigned int index, float value )
 		}
 		return FF_SUCCESS;
 
+	case PT_TEST_LANE:
+		testLane_ = std::clamp( static_cast< int >( std::lround( value ) ), 0, kLanes - 1 );
+		return FF_SUCCESS;
+
+	case PT_ENV1_DIAL:
+	case PT_ENV2_DIAL:
+	case PT_ENV3_DIAL:
+	case PT_ENV4_DIAL:
+	{
+		const int lane    = static_cast< int >( index - PT_ENV1_DIAL );
+		const int element = std::clamp( static_cast< int >( std::lround( value ) ), 0, 8 );
+		envDial_[ lane ]     = element - 1;
+		envOscSent_[ lane ]  = -1.0f;
+		return FF_SUCCESS;
+	}
+
 	case PT_BARS_GEN:
 		generatorBars_ = std::clamp( static_cast< int >( std::lround( value ) ), 1, 8 );
 		return FF_SUCCESS;
@@ -543,6 +586,13 @@ float MidiRollPlugin::GetFloatParameter( unsigned int index )
 		return static_cast< float >( ccChannelElement_ );
 	case PT_TEST_CC:
 		return 0.0f;
+	case PT_TEST_LANE:
+		return static_cast< float >( testLane_ );
+	case PT_ENV1_DIAL:
+	case PT_ENV2_DIAL:
+	case PT_ENV3_DIAL:
+	case PT_ENV4_DIAL:
+		return static_cast< float >( envDial_[ index - PT_ENV1_DIAL ] + 1 );
 	case PT_BARS_GEN:
 		return static_cast< float >( generatorBars_ );
 	case PT_DENSITY:
@@ -903,6 +953,7 @@ void MidiRollPlugin::StopAll()
 	midi_.AllNotesOff();
 	envelopes_.Reset();
 	envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
+	envOscSent_[ 0 ] = envOscSent_[ 1 ] = envOscSent_[ 2 ] = envOscSent_[ 3 ] = -1.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -925,14 +976,29 @@ void MidiRollPlugin::PushEnvelopeParams()
 			RaiseParamEvent( kParamIds[ lane ], FF_EVENT_FLAG_VALUE );
 		}
 
-		if( !midi_.IsOpen() || ccTestActive_ )
-			continue;
-
-		const int ccValue = static_cast< int >( std::lround( value * 127.0f ) );
-		if( ccValue != envCcSent_[ lane ] )
+		if( midi_.IsOpen() && !ccTestActive_ )
 		{
-			envCcSent_[ lane ] = ccValue;
-			midi_.ControlChange( CcChannel(), kCcBase + lane, ccValue );
+			const int ccValue = static_cast< int >( std::lround( value * 127.0f ) );
+			if( ccValue != envCcSent_[ lane ] )
+			{
+				envCcSent_[ lane ] = ccValue;
+				midi_.ControlChange( CcChannel(), kCcBase + lane, ccValue );
+			}
+		}
+
+		// Direct OSC path: no MIDI learn, no shortcut preset. Resolume only
+		// needs OSC input enabled. The dial is a composition dashboard dial.
+		const int dial = envDial_[ lane ];
+		if( dial >= 0 && osc_.IsOpen() )
+		{
+			if( std::fabs( value - envOscSent_[ lane ] ) > 0.002f )
+			{
+				envOscSent_[ lane ] = value;
+
+				char address[ 64 ] = {};
+				std::snprintf( address, sizeof( address ), "/composition/dashboard/link%d", dial + 1 );
+				osc_.SendFloat( address, value );
+			}
 		}
 	}
 }
@@ -951,20 +1017,14 @@ void MidiRollPlugin::UpdateCcTest( float deltaSeconds )
 
 	if( midi_.IsOpen() )
 	{
-		// 0..127..0 triangle over 1.6 s, each lane a quarter cycle apart. The
-		// first CC (21) is sent first, so MIDI learn grabs Env 1; the other
-		// lanes can be selected by editing the learned CC number.
+		// 0..127..0 triangle over 1.6 s on the selected lane only, so the
+		// learned CC number is predictable: Env 1 -> 21, Env 2 -> 22, etc.
 		constexpr float kCycle = 1.6f;
 		const float phase   = std::fmod( ccTestElapsed_ / kCycle, 1.0f );
-		const int channel   = CcChannel();
+		const float triangle = 1.0f - std::fabs( 2.0f * phase - 1.0f );
+		const int ccValue    = static_cast< int >( std::lround( triangle * 127.0f ) );
 
-		for( int lane = 0; lane < kLanes; ++lane )
-		{
-			const float shifted  = std::fmod( phase + 0.25f * static_cast< float >( lane ), 1.0f );
-			const float triangle = 1.0f - std::fabs( 2.0f * shifted - 1.0f );
-			const int ccValue    = static_cast< int >( std::lround( triangle * 127.0f ) );
-			midi_.ControlChange( channel, kCcBase + lane, ccValue );
-		}
+		midi_.ControlChange( CcChannel(), kCcBase + testLane_, ccValue );
 	}
 }
 

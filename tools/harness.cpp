@@ -264,6 +264,8 @@ int main( int argc, char** argv )
 	bool previous        = false;
 	bool testCc          = false;
 	int ccChannel        = 0;
+	int testLane         = 0;
+	int envDials[ 4 ]    = { 0, 0, 0, 0 };
 	std::string notesJson;
 	std::string portHint = "loopmidi";
 
@@ -287,6 +289,16 @@ int main( int argc, char** argv )
 			testCc = true;
 		else if( std::strcmp( argv[ i ], "--cc-channel" ) == 0 && i + 1 < argc )
 			ccChannel = std::atoi( argv[ ++i ] );
+		else if( std::strcmp( argv[ i ], "--test-lane" ) == 0 && i + 1 < argc )
+			testLane = std::atoi( argv[ ++i ] );
+		else if( std::strcmp( argv[ i ], "--env1-dial" ) == 0 && i + 1 < argc )
+			envDials[ 0 ] = std::atoi( argv[ ++i ] );
+		else if( std::strcmp( argv[ i ], "--env2-dial" ) == 0 && i + 1 < argc )
+			envDials[ 1 ] = std::atoi( argv[ ++i ] );
+		else if( std::strcmp( argv[ i ], "--env3-dial" ) == 0 && i + 1 < argc )
+			envDials[ 2 ] = std::atoi( argv[ ++i ] );
+		else if( std::strcmp( argv[ i ], "--env4-dial" ) == 0 && i + 1 < argc )
+			envDials[ 3 ] = std::atoi( argv[ ++i ] );
 		else if( std::strcmp( argv[ i ], "--root" ) == 0 && i + 1 < argc )
 			rootIndex = std::atoi( argv[ ++i ] );
 		else if( std::strcmp( argv[ i ], "--scale" ) == 0 && i + 1 < argc )
@@ -452,6 +464,10 @@ int main( int argc, char** argv )
 	SetFloat( 2, division ); // Length: 4, 8, 16 or 32
 	SetFloat( 3, 0.30f );   // Decay ~0.93 s
 	SetFloat( 24, static_cast< float >( ccChannel ) ); // CC Channel: 0 = same as Midi
+	SetFloat( 26, static_cast< float >( testLane ) );  // Test Lane: 0..3
+
+	for( int lane = 0; lane < 4; ++lane )
+		SetFloat( 27 + lane, static_cast< float >( envDials[ lane ] ) ); // Env N Dial
 
 	if( testCc )
 		SetFloat( 25, 1.0f ); // Test CC sweep
@@ -578,10 +594,24 @@ int main( int argc, char** argv )
 
 	{
 		std::lock_guard< std::mutex > lock( g_midiMutex );
-		const size_t shown = std::min< size_t >( g_midiLog.size(), 10 );
-		const size_t start = g_midiLog.size() - shown;
-		for( size_t i = start; i < g_midiLog.size(); ++i )
-			std::printf( "  %s\n", g_midiLog[ i ].c_str() );
+		int printed = 0;
+		for( size_t i = 0; i < g_midiLog.size() && printed < 10; ++i )
+		{
+			const std::string& line = g_midiLog[ i ];
+
+			// Other apps may share the port and flood it with unrelated CCs.
+			// Keep the envelope CCs (21..24) and all note messages.
+			if( line.rfind( "cc ", 0 ) == 0 )
+			{
+				int channel = 0;
+				int cc      = -1;
+				if( std::sscanf( line.c_str(), "cc ch%d cc %d", &channel, &cc ) == 2 && cc < 21 )
+					continue;
+			}
+
+			std::printf( "  %s\n", line.c_str() );
+			++printed;
+		}
 	}
 
 	std::printf( "Env puncak     : %.2f %.2f %.2f %.2f\n", envMax[ 0 ], envMax[ 1 ], envMax[ 2 ], envMax[ 3 ] );

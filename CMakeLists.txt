@@ -25,6 +25,7 @@ add_library(MidiRoll SHARED
 	src/MidiRollPlugin.cpp
 	src/EnvelopeEngine.cpp
 	src/MidiOut.cpp
+	src/OscOut.cpp
 	src/BridgeServer.cpp
 	src/BrowserLauncher.cpp
 	"${FFGL_ROOT}/source/lib/FFGLSDK.cpp"

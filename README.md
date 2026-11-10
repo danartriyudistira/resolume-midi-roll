@@ -231,9 +231,9 @@ bawaan: genre 0 Techno, 1 House, 2 Trance, 3 Drum & Bass, 4 Hip-Hop; template
 `--density N` (0–1) menguji nada dasar, scale, panjang, progresi, dan kepadatan.
 Tambahkan `--random` untuk variasi acak terkendali dan `--previous` untuk menguji
 tombol Previous setelah Load/Random. `--cc-channel N` (0 = sama dengan Midi
-Channel, 1–16 = channel eksplisit) dan `--test-cc` menguji routing CC envelope
-dan sweep MIDI learn. Harness mencetak `Root/Scale`, `Bars/Density`,
-`Progression`, dan `Notes`.
+Channel, 1–16 = channel eksplisit), `--test-lane N` (0–3), `--test-cc`, dan
+`--env1-dial N` … `--env4-dial N` (0 = Off, 1–8 = Dial) menguji routing CC/OSC.
+Harness mencetak `Root/Scale`, `Bars/Density`, `Progression`, dan `Notes`.
 
 ## Peta parameter
 
@@ -262,13 +262,16 @@ dan sweep MIDI learn. Harness mencetak `Root/Scale`, `Bars/Density`,
 | 23 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
 | 24 | CC Channel | option | `Same as Midi` atau `Channel 1`–`Channel 16` untuk CC 21–24 |
 | 25 | Test CC | event | toggle sweep CC 21–24 untuk MIDI learn |
+| 26 | Test Lane | option | `Env 1`–`Env 4`; lane yang digerakkan Test CC |
+| 27–30 | Env 1 Dial … Env 4 Dial | option | `Off` atau `Dial 1`–`Dial 8` (composition dashboard, via OSC) |
 
 ### Panel Resolume
 
 Urutan panel mengikuti alur live: **Midi Port** (dropdown), **Midi Channel**,
 **Decay**, **Edit Mode**, **Env 1..4**, **Pattern**, **Notes**, **Midi Offset**,
 **Root**, **Scale**, **Genre**, **Template**, **Bars**, **Progression**,
-**Density**, **Load**, **Random**, **Previous**, **CC Channel**, **Test CC**.
+**Density**, **Load**, **Random**, **Previous**, **CC Channel**, **Test CC**,
+**Test Lane**, **Env 1 Dial**, **Env 2 Dial**, **Env 3 Dial**, **Env 4 Dial**.
 
 `Load Template` dan `Random` lama (index 16–17) disembunyikan dari panel tetapi
 tetap ada agar preset lama tidak bergeser. Tombol yang dipakai sekarang adalah
@@ -439,6 +442,31 @@ Alur live: putar Genre/Template/Root/Scale/Bars dan Density di Dashboard, tekan
 **Random** di panel sampai pola cocok, **Previous** kalau meleset. Detail note
 diedit di web lewat **Edit Mode**.
 
+### Env sebagai penggerak Dashboard (OSC, tanpa MIDI)
+
+Cara paling sederhana: pilih rotary tujuan langsung dari panel Midi Roll.
+
+1. Di Resolume: **Preferences → OSC** → aktifkan **OSC Input**, port **7000**.
+2. Di effect Midi Roll, set:
+   - `Env 1 Dial = Dial 1`
+   - `Env 2 Dial = Dial 2`
+   - `Env 3 Dial = Dial 3`
+   - `Env 4 Dial = Dial 4`
+3. Buka **Composition Dashboard** (bukan clip/layer dashboard).
+4. Drag parameter warna ke rotary yang sesuai, mis. `Hue Rotate` → Dial 1.
+5. Play clip. Env 1–4 langsung menggerakkan Dial 1–4.
+
+Plugin mengirim OSC ke `/composition/dashboard/link1` … `link8` setiap kali nilai
+Env berubah. Tidak ada MIDI learn, tidak ada Shortcut Preset, dan loopMIDI tidak
+dipakai untuk jalur ini.
+
+**Penting:** jangan drag parameter **Env** ke dashboard. Itu membuat dial
+mengontrol Env (arah terbalik). Yang benar: dial **digerakkan oleh OSC** dari
+plugin, lalu parameter warna yang di-link ke dial.
+
+Kalau memakai dashboard **clip** atau **layer**, gunakan jalur MIDI CC di bawah;
+alamat OSC-nya membutuhkan nomor layer/clip yang tidak diketahui plugin.
+
 ### Env sebagai penggerak Dashboard (CC)
 
 Env 1–4 dipancarkan sebagai **MIDI CC 21–24**. Resolume bisa memetakan CC itu ke
@@ -452,27 +480,32 @@ Env 1..4 → CC 21..24 (loopMIDI) → MIDI shortcut → Dashboard dial → param
 - **CC Channel** memisahkan channel CC dari channel note. Contoh: note ke synth
   di `Channel 1`, CC ke Resolume di `Channel 16`. Default `Same as Midi`
   mempertahankan perilaku lama.
-- **Test CC** adalah toggle: tekan sekali untuk mulai sweep 0→127→0 pada CC 21–24,
-  tekan lagi untuk berhenti. Tekan **sebelum** masuk MIDI map mode — di map mode,
-  klik tombol hanya memilih tombol itu, bukan menjalankannya.
+- **Test CC** adalah toggle: tekan sekali untuk mulai sweep 0→127→0, tekan lagi
+  untuk berhenti. Sweep hanya menggerakkan lane yang dipilih di **Test Lane**.
+  Tekan **sebelum** masuk MIDI map mode — di map mode, klik tombol hanya memilih
+  tombol itu, bukan menjalankannya.
 - CC hanya dikirim saat nilainya berubah; setelah port/channel diganti, plugin
   mengirim ulang nilai saat ini.
 
-Langkah mapping:
+Langkah mapping (ulangi untuk tiap Env):
 
 1. Aktifkan `loopMIDI Port` sebagai MIDI Input di Preferences Resolume.
 2. Di Midi Roll: `Midi Port = loopMIDI Port`, `Midi Channel` untuk note, dan
    `CC Channel` untuk CC (mis. `Channel 16`).
-3. Tekan **Test CC** (sweep mulai berjalan).
-4. Masuk MIDI shortcut mode, klik dial Dashboard yang dituju. Resolume
-   menangkap CC 21 (Env 1).
-5. Set mode **Absolute**, lalu keluar dari map mode.
-6. Tekan **Test CC** lagi untuk menghentikan sweep.
-7. Untuk Env 2–4, ubah nomor CC di panel shortcut menjadi 22/23/24.
-8. Drag parameter warna ke dial yang sama: `Hue Rotate`, `Colorize` → `Hue`,
+3. Set **Test Lane = Env 1**.
+4. Tekan **Test CC** (sweep mulai berjalan).
+5. Masuk MIDI shortcut mode, klik rotary Dashboard 1. Resolume menangkap
+   **CC 21**.
+6. Set mode **Absolute**, lalu keluar dari map mode.
+7. Tekan **Test CC** lagi untuk menghentikan sweep.
+8. Ulangi langkah 3–7 untuk **Env 2 → rotary 2 (CC 22)**, **Env 3 → rotary 3
+   (CC 23)**, **Env 4 → rotary 4 (CC 24)**.
+9. Drag parameter warna ke tiap rotary: `Hue Rotate`, `Colorize` → `Hue`,
    atau `Add/Subtract` → `R`/`G`/`B`.
-9. Atur **In/Out**, **Invert**, dan **Dial Range** per parameter.
-10. Simpan **Shortcut Preset** — mapping MIDI tidak ikut tersimpan di `.avc`.
+10. Atur **In/Out**, **Invert**, dan **Dial Range** per parameter.
+11. Simpan **Shortcut Preset** — mapping MIDI tidak ikut tersimpan di `.avc`.
+
+Dengan begitu Env 1–4 menggerakkan empat rotary Dashboard secara independen.
 
 Satu CC yang sama boleh di-map ke beberapa dial sekaligus: dial clip, dial layer,
 dan dial composition. Dengan begitu satu Env bisa memodulasi warna di beberapa
