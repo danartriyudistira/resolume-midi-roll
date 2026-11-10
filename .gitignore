@@ -1,0 +1,24 @@
+# Build output
+build/
+out/
+*.dll
+*.lib
+*.exp
+*.pdb
+*.obj
+*.ilk
+*.exe
+
+# Web build
+web/node_modules/
+web/dist/
+web/.vite/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local logs
+*.log
