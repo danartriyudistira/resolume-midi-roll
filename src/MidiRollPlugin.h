@@ -4,6 +4,7 @@
 
 #include "EnvelopeEngine.h"
 #include "MidiOut.h"
+#include "OscOut.h"
 
 #include <chrono>
 #include <string>
@@ -50,6 +51,7 @@ private:
 		PT_DECAY,
 		PT_EDIT_MODE,
 		PT_ENV1,
+		PT_ENV1_DIAL,
 		PT_ENV2,
 		PT_ENV3,
 		PT_ENV4,
@@ -157,6 +159,7 @@ private:
 
 	midiroll::EnvelopeEngine envelopes_;
 	midiroll::MidiOut midi_;
+	midiroll::OscOut osc_;
 
 	// --- Host transport ----------------------------------------------------
 	double hostTime_         = 0.0;
@@ -207,6 +210,10 @@ private:
 
 	float envPushed_[ kLanes ] = {};
 	int envCcSent_[ kLanes ]   = { -1, -1, -1, -1 };
+
+	// -1 = Off, 0..7 = composition dashboard dial link1..link8.
+	int env1Dial_              = -1;
+	float env1OscSent_         = -1.0f;
 
 	float pattern_[ kLanes ][ kMaxSteps ] = {};
 

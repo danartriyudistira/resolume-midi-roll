@@ -229,9 +229,10 @@ bawaan: genre 0 Techno, 1 House, 2 Trance, 3 Drum & Bass, 4 Hip-Hop; template
 0 Empty, 1 Drums, 2 Bassline, 3 Melody, 4 Full Groove. `--root N` (0–11),
 `--scale N` (0–5), `--bars N` (1–8), `--progression "A D A G"`, dan
 `--density N` (0–1) menguji nada dasar, scale, panjang, progresi, dan kepadatan.
-Tambahkan `--random` untuk variasi acak terkendali dan `--previous` untuk menguji
-tombol Previous setelah Load/Random. Harness mencetak `Root/Scale`,
-`Bars/Density`, `Progression`, dan `Notes`.
+Tambahkan `--random` untuk variasi acak terkendali, `--previous` untuk menguji
+tombol Previous, dan `--env1-dial N` (0 = Off, 1–8 = Dial) untuk menguji OSC
+dashboard. Harness mencetak `Root/Scale`, `Bars/Density`, `Progression`, dan
+`Notes`.
 
 ## Peta parameter
 
@@ -242,29 +243,32 @@ tombol Previous setelah Load/Random. Harness mencetak `Root/Scale`,
 | 2 | Grid | option | **disembunyikan** dari panel; disimpan untuk kompatibilitas preset |
 | 3 | Decay | standard | 0.05–3.0 detik |
 | 4 | Edit Mode | event | buka piano roll di browser |
-| 5–8 | Env 1..4 | standard | keluaran; lane aktif mengikuti note yang di-fold |
-| 9 | Pattern | text | 128 karakter, pola 4 lane lama (fallback) |
-| 10 | Notes | text | JSON daftar note dari piano roll |
-| 11 | Midi Offset | standard | kompensasi latency −80…+80 ms, 0.5 = netral |
-| 12 | Root | option | `C` … `B` — nada dasar untuk bass/melodi |
-| 13 | Scale | option | `Major`, `Natural Minor`, `Dorian`, `Mixolydian`, `Pentatonic Minor`, `Pentatonic Major` |
-| 14 | Genre | option | `Techno`, `House`, `Trance`, `Drum & Bass`, `Hip-Hop` |
-| 15 | Template | option | `Empty`, `Drums`, `Bassline`, `Melody`, `Full Groove` |
-| 16 | Load Template | event | **disembunyikan**; digantikan `Load` #21 (disimpan untuk kompatibilitas preset) |
-| 17 | Random | event | **disembunyikan**; digantikan `Random` #22 (disimpan untuk kompatibilitas preset) |
-| 18 | Bars | option | 1–8 bar untuk pola yang dihasilkan (default 1) |
-| 19 | Progression | text | root/kualitas chord per bar, mis. `Am Dm A G` |
-| 20 | Density | standard | 0–1, kepadatan Random (default 0.5) |
-| 21 | Load | event | memuat template + menyimpan snapshot ke history |
-| 22 | Random | event | variasi acak + menyimpan snapshot ke history |
-| 23 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
+| 5 | Env 1 | standard | keluaran; lane aktif mengikuti note yang di-fold |
+| 6 | Env 1 Dial | option | `Off` atau `Dial 1`–`Dial 8` (composition dashboard, via OSC) |
+| 7–9 | Env 2..4 | standard | keluaran; lane aktif mengikuti note yang di-fold |
+| 10 | Pattern | text | 128 karakter, pola 4 lane lama (fallback) |
+| 11 | Notes | text | JSON daftar note dari piano roll |
+| 12 | Midi Offset | standard | kompensasi latency −80…+80 ms, 0.5 = netral |
+| 13 | Root | option | `C` … `B` — nada dasar untuk bass/melodi |
+| 14 | Scale | option | `Major`, `Natural Minor`, `Dorian`, `Mixolydian`, `Pentatonic Minor`, `Pentatonic Major` |
+| 15 | Genre | option | `Techno`, `House`, `Trance`, `Drum & Bass`, `Hip-Hop` |
+| 16 | Template | option | `Empty`, `Drums`, `Bassline`, `Melody`, `Full Groove` |
+| 17 | Load Template | event | **disembunyikan**; digantikan `Load` #22 (disimpan untuk kompatibilitas preset) |
+| 18 | Random | event | **disembunyikan**; digantikan `Random` #23 (disimpan untuk kompatibilitas preset) |
+| 19 | Bars | option | 1–8 bar untuk pola yang dihasilkan (default 1) |
+| 20 | Progression | text | root/kualitas chord per bar, mis. `Am Dm A G` |
+| 21 | Density | standard | 0–1, kepadatan Random (default 0.5) |
+| 22 | Load | event | memuat template + menyimpan snapshot ke history |
+| 23 | Random | event | variasi acak + menyimpan snapshot ke history |
+| 24 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
 
 ### Panel Resolume
 
 Urutan panel mengikuti alur live: **Midi Port** (dropdown), **Midi Channel**,
-**Decay**, **Edit Mode**, **Env 1..4**, **Pattern**, **Notes**, **Midi Offset**,
-**Root**, **Scale**, **Genre**, **Template**, **Bars**, **Progression**,
-**Density**, **Load**, **Random**, **Previous**.
+**Decay**, **Edit Mode**, **Env 1**, **Env 1 Dial**, **Env 2**, **Env 3**,
+**Env 4**, **Pattern**, **Notes**, **Midi Offset**, **Root**, **Scale**,
+**Genre**, **Template**, **Bars**, **Progression**, **Density**, **Load**,
+**Random**, **Previous**.
 
 `Load Template` dan `Random` lama (index 16–17) disembunyikan dari panel tetapi
 tetap ada agar preset lama tidak bergeser. Tombol yang dipakai sekarang adalah
@@ -434,6 +438,27 @@ Catatan penting:
 Alur live: putar Genre/Template/Root/Scale/Bars dan Density di Dashboard, tekan
 **Random** di panel sampai pola cocok, **Previous** kalau meleset. Detail note
 diedit di web lewat **Edit Mode**.
+
+### Env 1 → Dashboard (OSC)
+
+`Env 1 Dial` berada tepat di bawah **Env 1** dan di atas **Env 2**. Menu ini
+memilih rotary **Composition Dashboard** yang digerakkan Env 1 lewat **OSC**,
+bukan MIDI.
+
+1. Resolume → **Preferences → OSC** → aktifkan **OSC Input** (port **7000**).
+2. Di Midi Roll, set `Env 1 Dial = Dial 1` … `Dial 8`.
+3. Buka **Composition Dashboard**, drag parameter warna ke rotary yang sama.
+4. Play clip. Env 1 menggerakkan rotary tersebut.
+
+Plugin mengirim `/composition/dashboard/linkN` setiap nilai Env 1 berubah.
+Tidak ada MIDI learn atau Shortcut Preset untuk jalur ini.
+
+**Penting:** jangan drag parameter **Env 1** ke dashboard. Itu membuat dial
+mengontrol Env 1 (arah terbalik). Dial harus digerakkan oleh OSC dari plugin,
+lalu parameter warna di-link ke dial.
+
+Untuk Env 2–4, gunakan jalur MIDI CC di bawah; dropdown OSC bisa ditambahkan
+menyusul dengan pola yang sama.
 
 ### Env sebagai penggerak Dashboard (CC)
 

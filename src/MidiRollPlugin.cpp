@@ -100,6 +100,17 @@ MidiRollPlugin::MidiRollPlugin()
 
 	// --- Envelope outputs --------------------------------------------------
 	SetParamInfo( PT_ENV1, "Env 1", FF_TYPE_STANDARD, 0.0f );
+
+	// Sits between Env 1 and Env 2: choose which composition dashboard rotary
+	// Env 1 drives over OSC.
+	SetOptionParamInfo( PT_ENV1_DIAL, "Env 1 Dial", 9, 0.0f );
+	SetParamElementInfo( PT_ENV1_DIAL, 0, "Off", 0.0f );
+	for( int dial = 0; dial < 8; ++dial )
+	{
+		const std::string label = "Dial " + std::to_string( dial + 1 );
+		SetParamElementInfo( PT_ENV1_DIAL, static_cast< unsigned int >( dial + 1 ), label.c_str(), static_cast< float >( dial + 1 ) );
+	}
+
 	SetParamInfo( PT_ENV2, "Env 2", FF_TYPE_STANDARD, 0.0f );
 	SetParamInfo( PT_ENV3, "Env 3", FF_TYPE_STANDARD, 0.0f );
 	SetParamInfo( PT_ENV4, "Env 4", FF_TYPE_STANDARD, 0.0f );
@@ -188,6 +199,7 @@ MidiRollPlugin::MidiRollPlugin()
 	rngState_ = static_cast< unsigned int >(
 		std::chrono::steady_clock::now().time_since_epoch().count() ) | 1u;
 
+	osc_.Open( 7000 );
 	midiroll::BridgeServer::Instance().Acquire();
 	PublishCurrentPattern();
 
@@ -197,6 +209,7 @@ MidiRollPlugin::MidiRollPlugin()
 MidiRollPlugin::~MidiRollPlugin()
 {
 	StopAll();
+	osc_.Close();
 	midi_.Close();
 	midiroll::BridgeServer::Instance().Release();
 }
@@ -410,6 +423,14 @@ FFResult MidiRollPlugin::SetFloatParameter( unsigned int index, float value )
 		// applies our value change events; ignore them.
 		return FF_SUCCESS;
 
+	case PT_ENV1_DIAL:
+	{
+		const int element = std::clamp( static_cast< int >( std::lround( value ) ), 0, 8 );
+		env1Dial_     = element - 1;
+		env1OscSent_  = -1.0f;
+		return FF_SUCCESS;
+	}
+
 	case PT_ROOT:
 		rootIndex_ = std::clamp( static_cast< int >( std::lround( value ) ), 0, 11 );
 		return FF_SUCCESS;
@@ -480,6 +501,8 @@ float MidiRollPlugin::GetFloatParameter( unsigned int index )
 		return 0.0f;
 	case PT_ENV1:
 		return envelopes_.Value( 0 );
+	case PT_ENV1_DIAL:
+		return static_cast< float >( env1Dial_ + 1 );
 	case PT_ENV2:
 		return envelopes_.Value( 1 );
 	case PT_ENV3:
@@ -861,6 +884,7 @@ void MidiRollPlugin::StopAll()
 	midi_.AllNotesOff();
 	envelopes_.Reset();
 	envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
+	env1OscSent_ = -1.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -890,6 +914,18 @@ void MidiRollPlugin::PushEnvelopeParams()
 			{
 				envCcSent_[ lane ] = ccValue;
 				midi_.ControlChange( midiChannel_, kCcBase + lane, ccValue );
+			}
+		}
+
+		if( lane == 0 && env1Dial_ >= 0 && osc_.IsOpen() )
+		{
+			if( std::fabs( value - env1OscSent_ ) > 0.002f )
+			{
+				env1OscSent_ = value;
+
+				char address[ 64 ] = {};
+				std::snprintf( address, sizeof( address ), "/composition/dashboard/link%d", env1Dial_ + 1 );
+				osc_.SendFloat( address, value );
 			}
 		}
 	}
@@ -1131,8 +1167,10 @@ void MidiRollPlugin::UpdateEnvelopeLanes( bool raiseEvent )
 			pitchLane_[ unique[ lane ] ] = lane;
 	}
 
+	static const unsigned int kEnvIds[ kLanes ] = { PT_ENV1, PT_ENV2, PT_ENV3, PT_ENV4 };
+
 	for( int lane = 0; lane < kLanes; ++lane )
-		SetParamVisibility( PT_ENV1 + lane, lane < activeLanes_, raiseEvent );
+		SetParamVisibility( kEnvIds[ lane ], lane < activeLanes_, raiseEvent );
 }
 
 int MidiRollPlugin::LaneForPitch( int pitch ) const
