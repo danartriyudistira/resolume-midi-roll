@@ -260,18 +260,18 @@ Harness mencetak `Root/Scale`, `Bars/Density`, `Progression`, dan `Notes`.
 | 21 | Load | event | memuat template + menyimpan snapshot ke history |
 | 22 | Random | event | variasi acak + menyimpan snapshot ke history |
 | 23 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
-| 24 | CC Channel | option | `Same as Midi` atau `Channel 1`–`Channel 16` untuk CC 21–24 |
-| 25 | Test CC | event | toggle sweep CC 21–24 untuk MIDI learn |
-| 26 | Test Lane | option | `Env 1`–`Env 4`; lane yang digerakkan Test CC |
-| 27–30 | Env 1 Dial … Env 4 Dial | option | `Off` atau `Dial 1`–`Dial 8` (composition dashboard, via OSC) |
+| 24 | CC Channel | option | **disembunyikan**; CC tetap mengikuti Midi Channel |
+| 25–28 | Env 1 Dial … Env 4 Dial | option | `Off` atau `Dial 1`–`Dial 8` (composition dashboard, via REST) |
+| 29 | Test CC | event | toggle sweep CC 21–24 untuk MIDI learn |
+| 30 | Test Lane | option | `Env 1`–`Env 4`; lane yang digerakkan Test CC |
 
 ### Panel Resolume
 
 Urutan panel mengikuti alur live: **Midi Port** (dropdown), **Midi Channel**,
 **Decay**, **Edit Mode**, **Env 1..4**, **Pattern**, **Notes**, **Midi Offset**,
 **Root**, **Scale**, **Genre**, **Template**, **Bars**, **Progression**,
-**Density**, **Load**, **Random**, **Previous**, **CC Channel**, **Test CC**,
-**Test Lane**, **Env 1 Dial**, **Env 2 Dial**, **Env 3 Dial**, **Env 4 Dial**.
+**Density**, **Load**, **Random**, **Previous**, **Env 1 Dial**, **Env 2 Dial**,
+**Env 3 Dial**, **Env 4 Dial**, **Test CC**, **Test Lane**.
 
 `Load Template` dan `Random` lama (index 16–17) disembunyikan dari panel tetapi
 tetap ada agar preset lama tidak bergeser. Tombol yang dipakai sekarang adalah
@@ -480,9 +480,8 @@ Env tidak menjadi dial itu sendiri — Env **menggerakkan** dial lewat MIDI.
 Env 1..4 → CC 21..24 (loopMIDI) → MIDI shortcut → Dashboard dial → parameter warna
 ```
 
-- **CC Channel** memisahkan channel CC dari channel note. Contoh: note ke synth
-  di `Channel 1`, CC ke Resolume di `Channel 16`. Default `Same as Midi`
-  mempertahankan perilaku lama.
+- CC selalu dikirim di channel yang sama dengan note. `CC Channel` disembunyikan
+  dari panel; nilai lamanya tetap disimpan untuk kompatibilitas preset.
 - **Test CC** adalah toggle: tekan sekali untuk mulai sweep 0→127→0, tekan lagi
   untuk berhenti. Sweep hanya menggerakkan lane yang dipilih di **Test Lane**.
   Tekan **sebelum** masuk MIDI map mode — di map mode, klik tombol hanya memilih
@@ -493,8 +492,8 @@ Env 1..4 → CC 21..24 (loopMIDI) → MIDI shortcut → Dashboard dial → param
 Langkah mapping (ulangi untuk tiap Env):
 
 1. Aktifkan `loopMIDI Port` sebagai MIDI Input di Preferences Resolume.
-2. Di Midi Roll: `Midi Port = loopMIDI Port`, `Midi Channel` untuk note, dan
-   `CC Channel` untuk CC (mis. `Channel 16`).
+2. Di Midi Roll: `Midi Port = loopMIDI Port` dan `Midi Channel` untuk note
+   sekaligus CC (CC mengikuti channel note).
 3. Set **Test Lane = Env 1**.
 4. Tekan **Test CC** (sweep mulai berjalan).
 5. Masuk MIDI shortcut mode, klik rotary Dashboard 1. Resolume menangkap

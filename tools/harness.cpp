@@ -464,13 +464,13 @@ int main( int argc, char** argv )
 	SetFloat( 2, division ); // Length: 4, 8, 16 or 32
 	SetFloat( 3, 0.30f );   // Decay ~0.93 s
 	SetFloat( 24, static_cast< float >( ccChannel ) ); // CC Channel: 0 = same as Midi
-	SetFloat( 26, static_cast< float >( testLane ) );  // Test Lane: 0..3
+	SetFloat( 30, static_cast< float >( testLane ) );  // Test Lane: 0..3
 
 	for( int lane = 0; lane < 4; ++lane )
-		SetFloat( 27 + lane, static_cast< float >( envDials[ lane ] ) ); // Env N Dial
+		SetFloat( 25 + lane, static_cast< float >( envDials[ lane ] ) ); // Env N Dial
 
 	if( testCc )
-		SetFloat( 25, 1.0f ); // Test CC sweep
+		SetFloat( 29, 1.0f ); // Test CC sweep
 
 	if( !notesJson.empty() )
 		SetText( 10, notesJson.c_str() ); // Notes (free note list)

@@ -196,6 +196,10 @@ MidiRollPlugin::MidiRollPlugin()
 		SetParamElementInfo( PT_CC_CHANNEL, static_cast< unsigned int >( i + 1 ), label.c_str(), static_cast< float >( i + 1 ) );
 	}
 
+	// CC routing is fixed to "Same as Midi"; keep the parameter for preset
+	// compatibility but hide it from the panel.
+	SetParamVisibility( PT_CC_CHANNEL, false, false );
+
 	// Toggles a continuous 0..127..0 sweep on CC 21..24 for MIDI learn.
 	SetParamInfo( PT_TEST_CC, "Test CC", FF_TYPE_EVENT, false );
 
