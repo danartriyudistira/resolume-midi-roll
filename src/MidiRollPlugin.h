@@ -71,8 +71,6 @@ private:
 		PT_RANDOM_V2,
 		PT_PREVIOUS,
 		PT_CC_CHANNEL,
-		PT_TEST_CC,
-		PT_TEST_LANE,
 		PT_COUNT
 	};
 
@@ -107,9 +105,6 @@ private:
 	void ScheduleNoteOff( int note, int lane, float delaySeconds, int channel );
 	void FlushNoteOffs( float deltaSeconds );
 	void PushEnvelopeParams();
-	// Toggles a continuous CC 21..24 sweep so the user can MIDI-learn a
-	// dashboard dial without waiting for a note. Press again to stop.
-	void UpdateCcTest( float deltaSeconds );
 	int CcChannel() const;
 	void OpenConfiguredPort();
 	void StopAll();
@@ -217,9 +212,6 @@ private:
 
 	// 0 = same channel as the notes, 1..16 = explicit CC channel.
 	int ccChannelElement_      = 0;
-	int testLane_              = 0; // 0..3: which Env the Test CC sweep drives
-	bool ccTestActive_         = false;
-	float ccTestElapsed_       = 0.0f;
 
 	float pattern_[ kLanes ][ kMaxSteps ] = {};
 

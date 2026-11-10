@@ -200,17 +200,6 @@ MidiRollPlugin::MidiRollPlugin()
 	// compatibility but hide it from the panel.
 	SetParamVisibility( PT_CC_CHANNEL, false, false );
 
-	// Toggles a continuous 0..127..0 sweep on CC 21..24 for MIDI learn.
-	SetParamInfo( PT_TEST_CC, "Test CC", FF_TYPE_EVENT, false );
-
-	// Which envelope the Test CC sweep drives. Mapping one lane at a time makes
-	// the learned CC number predictable: Env 1 -> 21, Env 2 -> 22, and so on.
-	SetOptionParamInfo( PT_TEST_LANE, "Test Lane", 4, 0.0f );
-	SetParamElementInfo( PT_TEST_LANE, 0, "Env 1", 0.0f );
-	SetParamElementInfo( PT_TEST_LANE, 1, "Env 2", 1.0f );
-	SetParamElementInfo( PT_TEST_LANE, 2, "Env 3", 2.0f );
-	SetParamElementInfo( PT_TEST_LANE, 3, "Env 4", 3.0f );
-
 	// Seed the constrained randomizer once per instance.
 	rngState_ = static_cast< unsigned int >(
 		std::chrono::steady_clock::now().time_since_epoch().count() ) | 1u;
@@ -485,21 +474,6 @@ FFResult MidiRollPlugin::SetFloatParameter( unsigned int index, float value )
 		return FF_SUCCESS;
 	}
 
-	case PT_TEST_CC:
-		if( value >= 0.5f )
-		{
-			ccTestActive_  = !ccTestActive_;
-			ccTestElapsed_ = 0.0f;
-
-			if( !ccTestActive_ )
-				envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
-		}
-		return FF_SUCCESS;
-
-	case PT_TEST_LANE:
-		testLane_ = std::clamp( static_cast< int >( std::lround( value ) ), 0, kLanes - 1 );
-		return FF_SUCCESS;
-
 	case PT_BARS_GEN:
 		generatorBars_ = std::clamp( static_cast< int >( std::lround( value ) ), 1, 8 );
 		return FF_SUCCESS;
@@ -557,10 +531,6 @@ float MidiRollPlugin::GetFloatParameter( unsigned int index )
 		return 0.0f;
 	case PT_CC_CHANNEL:
 		return static_cast< float >( ccChannelElement_ );
-	case PT_TEST_CC:
-		return 0.0f;
-	case PT_TEST_LANE:
-		return static_cast< float >( testLane_ );
 	case PT_BARS_GEN:
 		return static_cast< float >( generatorBars_ );
 	case PT_DENSITY:
@@ -660,7 +630,6 @@ FFResult MidiRollPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	DriveSequencer( deltaSeconds );
 	FlushNoteOffs( deltaSeconds );
 	envelopes_.Advance( deltaSeconds );
-	UpdateCcTest( deltaSeconds );
 	PushEnvelopeParams();
 	PollBridge( deltaSeconds );
 
@@ -916,8 +885,6 @@ void MidiRollPlugin::StopAll()
 {
 	lastStep_     = -1;
 	pendingCount_ = 0;
-	ccTestActive_ = false;
-	ccTestElapsed_ = 0.0f;
 	midi_.AllNotesOff();
 	envelopes_.Reset();
 	envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
@@ -943,7 +910,7 @@ void MidiRollPlugin::PushEnvelopeParams()
 			RaiseParamEvent( kParamIds[ lane ], FF_EVENT_FLAG_VALUE );
 		}
 
-		if( midi_.IsOpen() && !ccTestActive_ )
+		if( midi_.IsOpen() )
 		{
 			const int ccValue = static_cast< int >( std::lround( value * 127.0f ) );
 			if( ccValue != envCcSent_[ lane ] )
@@ -958,26 +925,6 @@ void MidiRollPlugin::PushEnvelopeParams()
 int MidiRollPlugin::CcChannel() const
 {
 	return ccChannelElement_ > 0 ? ccChannelElement_ - 1 : midiChannel_;
-}
-
-void MidiRollPlugin::UpdateCcTest( float deltaSeconds )
-{
-	if( !ccTestActive_ )
-		return;
-
-	ccTestElapsed_ += deltaSeconds;
-
-	if( midi_.IsOpen() )
-	{
-		// 0..127..0 triangle over 1.6 s on the selected lane only, so the
-		// learned CC number is predictable: Env 1 -> 21, Env 2 -> 22, etc.
-		constexpr float kCycle = 1.6f;
-		const float phase   = std::fmod( ccTestElapsed_ / kCycle, 1.0f );
-		const float triangle = 1.0f - std::fabs( 2.0f * phase - 1.0f );
-		const int ccValue    = static_cast< int >( std::lround( triangle * 127.0f ) );
-
-		midi_.ControlChange( CcChannel(), kCcBase + testLane_, ccValue );
-	}
 }
 
 void MidiRollPlugin::OpenConfiguredPort()

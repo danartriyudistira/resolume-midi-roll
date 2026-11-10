@@ -231,9 +231,8 @@ bawaan: genre 0 Techno, 1 House, 2 Trance, 3 Drum & Bass, 4 Hip-Hop; template
 `--density N` (0–1) menguji nada dasar, scale, panjang, progresi, dan kepadatan.
 Tambahkan `--random` untuk variasi acak terkendali dan `--previous` untuk menguji
 tombol Previous setelah Load/Random. `--cc-channel N` (0 = sama dengan Midi
-Channel, 1–16 = channel eksplisit), `--test-lane N` (0–3), dan `--test-cc`
-menguji routing CC dan sweep MIDI learn. Harness mencetak `Root/Scale`,
-`Bars/Density`, `Progression`, dan `Notes`.
+Channel, 1–16 = channel eksplisit) menguji routing CC. Harness mencetak
+`Root/Scale`, `Bars/Density`, `Progression`, dan `Notes`.
 
 ## Peta parameter
 
@@ -261,15 +260,13 @@ menguji routing CC dan sweep MIDI learn. Harness mencetak `Root/Scale`,
 | 22 | Random | event | variasi acak + menyimpan snapshot ke history |
 | 23 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
 | 24 | CC Channel | option | **disembunyikan**; CC tetap mengikuti Midi Channel |
-| 25 | Test CC | event | toggle sweep CC 21–24 untuk MIDI learn |
-| 26 | Test Lane | option | `Env 1`–`Env 4`; lane yang digerakkan Test CC |
 
 ### Panel Resolume
 
 Urutan panel mengikuti alur live: **Midi Port** (dropdown), **Midi Channel**,
 **Decay**, **Edit Mode**, **Env 1..4**, **Pattern**, **Notes**, **Midi Offset**,
 **Root**, **Scale**, **Genre**, **Template**, **Bars**, **Progression**,
-**Density**, **Load**, **Random**, **Previous**, **Test CC**, **Test Lane**.
+**Density**, **Load**, **Random**, **Previous**.
 
 `Load Template` dan `Random` lama (index 16–17) disembunyikan dari panel tetapi
 tetap ada agar preset lama tidak bergeser. Tombol yang dipakai sekarang adalah
@@ -452,10 +449,6 @@ Env 1..4 → CC 21..24 (loopMIDI) → MIDI shortcut → Dashboard dial → param
 
 - CC selalu dikirim di channel yang sama dengan note. `CC Channel` disembunyikan
   dari panel; nilai lamanya tetap disimpan untuk kompatibilitas preset.
-- **Test CC** adalah toggle: tekan sekali untuk mulai sweep 0→127→0, tekan lagi
-  untuk berhenti. Sweep hanya menggerakkan lane yang dipilih di **Test Lane**.
-  Tekan **sebelum** masuk MIDI map mode — di map mode, klik tombol hanya memilih
-  tombol itu, bukan menjalankannya.
 - CC hanya dikirim saat nilainya berubah; setelah port/channel diganti, plugin
   mengirim ulang nilai saat ini.
 
@@ -464,18 +457,16 @@ Langkah mapping (ulangi untuk tiap Env):
 1. Aktifkan `loopMIDI Port` sebagai MIDI Input di Preferences Resolume.
 2. Di Midi Roll: `Midi Port = loopMIDI Port` dan `Midi Channel` untuk note
    sekaligus CC (CC mengikuti channel note).
-3. Set **Test Lane = Env 1**.
-4. Tekan **Test CC** (sweep mulai berjalan).
-5. Masuk MIDI shortcut mode, klik rotary Dashboard 1. Resolume menangkap
+3. Play clip supaya **Env 1** bergerak.
+4. Masuk MIDI shortcut mode, klik rotary Dashboard 1. Resolume menangkap
    **CC 21**.
-6. Set mode **Absolute**, lalu keluar dari map mode.
-7. Tekan **Test CC** lagi untuk menghentikan sweep.
-8. Ulangi langkah 3–7 untuk **Env 2 → rotary 2 (CC 22)**, **Env 3 → rotary 3
-   (CC 23)**, **Env 4 → rotary 4 (CC 24)**.
-9. Drag parameter warna ke tiap rotary: `Hue Rotate`, `Colorize` → `Hue`,
+5. Set mode **Absolute**, lalu keluar dari map mode.
+6. Ulangi untuk **Env 2 → rotary 2 (CC 22)**, **Env 3 → rotary 3 (CC 23)**,
+   **Env 4 → rotary 4 (CC 24)**. Nomor CC bisa diubah di panel Shortcuts.
+7. Drag parameter warna ke tiap rotary: `Hue Rotate`, `Colorize` → `Hue`,
    atau `Add/Subtract` → `R`/`G`/`B`.
-10. Atur **In/Out**, **Invert**, dan **Dial Range** per parameter.
-11. Simpan **Shortcut Preset** — mapping MIDI tidak ikut tersimpan di `.avc`.
+8. Atur **In/Out**, **Invert**, dan **Dial Range** per parameter.
+9. Simpan **Shortcut Preset** — mapping MIDI tidak ikut tersimpan di `.avc`.
 
 Dengan begitu Env 1–4 menggerakkan empat rotary Dashboard secara independen.
 
