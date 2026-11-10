@@ -265,7 +265,6 @@ int main( int argc, char** argv )
 	bool testCc          = false;
 	int ccChannel        = 0;
 	int testLane         = 0;
-	int envDials[ 4 ]    = { 0, 0, 0, 0 };
 	std::string notesJson;
 	std::string portHint = "loopmidi";
 
@@ -291,14 +290,6 @@ int main( int argc, char** argv )
 			ccChannel = std::atoi( argv[ ++i ] );
 		else if( std::strcmp( argv[ i ], "--test-lane" ) == 0 && i + 1 < argc )
 			testLane = std::atoi( argv[ ++i ] );
-		else if( std::strcmp( argv[ i ], "--env1-dial" ) == 0 && i + 1 < argc )
-			envDials[ 0 ] = std::atoi( argv[ ++i ] );
-		else if( std::strcmp( argv[ i ], "--env2-dial" ) == 0 && i + 1 < argc )
-			envDials[ 1 ] = std::atoi( argv[ ++i ] );
-		else if( std::strcmp( argv[ i ], "--env3-dial" ) == 0 && i + 1 < argc )
-			envDials[ 2 ] = std::atoi( argv[ ++i ] );
-		else if( std::strcmp( argv[ i ], "--env4-dial" ) == 0 && i + 1 < argc )
-			envDials[ 3 ] = std::atoi( argv[ ++i ] );
 		else if( std::strcmp( argv[ i ], "--root" ) == 0 && i + 1 < argc )
 			rootIndex = std::atoi( argv[ ++i ] );
 		else if( std::strcmp( argv[ i ], "--scale" ) == 0 && i + 1 < argc )
@@ -464,13 +455,10 @@ int main( int argc, char** argv )
 	SetFloat( 2, division ); // Length: 4, 8, 16 or 32
 	SetFloat( 3, 0.30f );   // Decay ~0.93 s
 	SetFloat( 24, static_cast< float >( ccChannel ) ); // CC Channel: 0 = same as Midi
-	SetFloat( 30, static_cast< float >( testLane ) );  // Test Lane: 0..3
-
-	for( int lane = 0; lane < 4; ++lane )
-		SetFloat( 25 + lane, static_cast< float >( envDials[ lane ] ) ); // Env N Dial
+	SetFloat( 26, static_cast< float >( testLane ) );  // Test Lane: 0..3
 
 	if( testCc )
-		SetFloat( 29, 1.0f ); // Test CC sweep
+		SetFloat( 25, 1.0f ); // Test CC sweep
 
 	if( !notesJson.empty() )
 		SetText( 10, notesJson.c_str() ); // Notes (free note list)

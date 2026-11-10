@@ -4,8 +4,6 @@
 
 #include "EnvelopeEngine.h"
 #include "MidiOut.h"
-#include "OscOut.h"
-#include "DashboardRest.h"
 
 #include <chrono>
 #include <string>
@@ -73,10 +71,6 @@ private:
 		PT_RANDOM_V2,
 		PT_PREVIOUS,
 		PT_CC_CHANNEL,
-		PT_ENV1_DIAL,
-		PT_ENV2_DIAL,
-		PT_ENV3_DIAL,
-		PT_ENV4_DIAL,
 		PT_TEST_CC,
 		PT_TEST_LANE,
 		PT_COUNT
@@ -170,8 +164,6 @@ private:
 
 	midiroll::EnvelopeEngine envelopes_;
 	midiroll::MidiOut midi_;
-	midiroll::OscOut osc_;
-	midiroll::DashboardRest dashboardRest_;
 
 	// --- Host transport ----------------------------------------------------
 	double hostTime_         = 0.0;
@@ -222,10 +214,6 @@ private:
 
 	float envPushed_[ kLanes ] = {};
 	int envCcSent_[ kLanes ]   = { -1, -1, -1, -1 };
-
-	// -1 = Off, 0..7 = composition dashboard dial link1..link8.
-	int envDial_[ kLanes ]     = { -1, -1, -1, -1 };
-	float envOscSent_[ kLanes ] = { -1.0f, -1.0f, -1.0f, -1.0f };
 
 	// 0 = same channel as the notes, 1..16 = explicit CC channel.
 	int ccChannelElement_      = 0;

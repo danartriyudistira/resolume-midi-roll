@@ -231,9 +231,9 @@ bawaan: genre 0 Techno, 1 House, 2 Trance, 3 Drum & Bass, 4 Hip-Hop; template
 `--density N` (0–1) menguji nada dasar, scale, panjang, progresi, dan kepadatan.
 Tambahkan `--random` untuk variasi acak terkendali dan `--previous` untuk menguji
 tombol Previous setelah Load/Random. `--cc-channel N` (0 = sama dengan Midi
-Channel, 1–16 = channel eksplisit), `--test-lane N` (0–3), `--test-cc`, dan
-`--env1-dial N` … `--env4-dial N` (0 = Off, 1–8 = Dial) menguji routing CC/OSC.
-Harness mencetak `Root/Scale`, `Bars/Density`, `Progression`, dan `Notes`.
+Channel, 1–16 = channel eksplisit), `--test-lane N` (0–3), dan `--test-cc`
+menguji routing CC dan sweep MIDI learn. Harness mencetak `Root/Scale`,
+`Bars/Density`, `Progression`, dan `Notes`.
 
 ## Peta parameter
 
@@ -261,17 +261,15 @@ Harness mencetak `Root/Scale`, `Bars/Density`, `Progression`, dan `Notes`.
 | 22 | Random | event | variasi acak + menyimpan snapshot ke history |
 | 23 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
 | 24 | CC Channel | option | **disembunyikan**; CC tetap mengikuti Midi Channel |
-| 25–28 | Env 1 Dial … Env 4 Dial | option | `Off` atau `Dial 1`–`Dial 8` (composition dashboard, via REST) |
-| 29 | Test CC | event | toggle sweep CC 21–24 untuk MIDI learn |
-| 30 | Test Lane | option | `Env 1`–`Env 4`; lane yang digerakkan Test CC |
+| 25 | Test CC | event | toggle sweep CC 21–24 untuk MIDI learn |
+| 26 | Test Lane | option | `Env 1`–`Env 4`; lane yang digerakkan Test CC |
 
 ### Panel Resolume
 
 Urutan panel mengikuti alur live: **Midi Port** (dropdown), **Midi Channel**,
 **Decay**, **Edit Mode**, **Env 1..4**, **Pattern**, **Notes**, **Midi Offset**,
 **Root**, **Scale**, **Genre**, **Template**, **Bars**, **Progression**,
-**Density**, **Load**, **Random**, **Previous**, **Env 1 Dial**, **Env 2 Dial**,
-**Env 3 Dial**, **Env 4 Dial**, **Test CC**, **Test Lane**.
+**Density**, **Load**, **Random**, **Previous**, **Test CC**, **Test Lane**.
 
 `Load Template` dan `Random` lama (index 16–17) disembunyikan dari panel tetapi
 tetap ada agar preset lama tidak bergeser. Tombol yang dipakai sekarang adalah
@@ -441,34 +439,6 @@ Catatan penting:
 Alur live: putar Genre/Template/Root/Scale/Bars dan Density di Dashboard, tekan
 **Random** di panel sampai pola cocok, **Previous** kalau meleset. Detail note
 diedit di web lewat **Edit Mode**.
-
-### Env sebagai penggerak Dashboard (otomatis)
-
-Cara paling sederhana: pilih rotary tujuan langsung dari panel Midi Roll.
-
-1. Di effect Midi Roll, set:
-   - `Env 1 Dial = Dial 1`
-   - `Env 2 Dial = Dial 2`
-   - `Env 3 Dial = Dial 3`
-   - `Env 4 Dial = Dial 4`
-2. Buka **Composition Dashboard** (bukan clip/layer dashboard).
-3. Drag parameter warna ke rotary yang sesuai, mis. `Hue Rotate` → Dial 1.
-4. Play clip. Env 1–4 langsung menggerakkan Dial 1–4.
-
-Plugin menulis nilai Env ke dial composition lewat **REST API Resolume**
-(`127.0.0.1:8080`), API yang sama yang dipakai editor web. Tidak perlu MIDI
-learn, Shortcut Preset, loopMIDI, atau mengaktifkan OSC.
-
-Kalau webserver Resolume dimatikan, plugin juga mengirim OSC ke
-`/composition/dashboard/link1` … `link8` sebagai cadangan; aktifkan **OSC Input**
-(port 7000) untuk jalur itu.
-
-**Penting:** jangan drag parameter **Env** ke dashboard. Itu membuat dial
-mengontrol Env (arah terbalik). Yang benar: dial **digerakkan oleh plugin**, lalu
-parameter warna yang di-link ke dial.
-
-Kalau memakai dashboard **clip** atau **layer**, gunakan jalur MIDI CC di bawah;
-alamat REST/OSC-nya membutuhkan nomor layer/clip yang tidak diketahui plugin.
 
 ### Env sebagai penggerak Dashboard (CC)
 

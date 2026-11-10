@@ -211,25 +211,6 @@ MidiRollPlugin::MidiRollPlugin()
 	SetParamElementInfo( PT_TEST_LANE, 2, "Env 3", 2.0f );
 	SetParamElementInfo( PT_TEST_LANE, 3, "Env 4", 3.0f );
 
-	// --- Dashboard OSC -----------------------------------------------------
-	// Each envelope can drive one composition dashboard dial directly over OSC.
-	// No MIDI learn is needed; Resolume only has to enable OSC input.
-	for( int lane = 0; lane < kLanes; ++lane )
-	{
-		const std::string name = "Env " + std::to_string( lane + 1 ) + " Dial";
-		SetOptionParamInfo( PT_ENV1_DIAL + lane, name.c_str(), 9, 0.0f );
-		SetParamElementInfo( PT_ENV1_DIAL + lane, 0, "Off", 0.0f );
-
-		for( int dial = 0; dial < 8; ++dial )
-		{
-			const std::string label = "Dial " + std::to_string( dial + 1 );
-			SetParamElementInfo( PT_ENV1_DIAL + lane, static_cast< unsigned int >( dial + 1 ), label.c_str(), static_cast< float >( dial + 1 ) );
-		}
-	}
-
-	osc_.Open( 7000 );
-	dashboardRest_.Start();
-
 	// Seed the constrained randomizer once per instance.
 	rngState_ = static_cast< unsigned int >(
 		std::chrono::steady_clock::now().time_since_epoch().count() ) | 1u;
@@ -243,8 +224,6 @@ MidiRollPlugin::MidiRollPlugin()
 MidiRollPlugin::~MidiRollPlugin()
 {
 	StopAll();
-	dashboardRest_.Stop();
-	osc_.Close();
 	midi_.Close();
 	midiroll::BridgeServer::Instance().Release();
 }
@@ -521,18 +500,6 @@ FFResult MidiRollPlugin::SetFloatParameter( unsigned int index, float value )
 		testLane_ = std::clamp( static_cast< int >( std::lround( value ) ), 0, kLanes - 1 );
 		return FF_SUCCESS;
 
-	case PT_ENV1_DIAL:
-	case PT_ENV2_DIAL:
-	case PT_ENV3_DIAL:
-	case PT_ENV4_DIAL:
-	{
-		const int lane    = static_cast< int >( index - PT_ENV1_DIAL );
-		const int element = std::clamp( static_cast< int >( std::lround( value ) ), 0, 8 );
-		envDial_[ lane ]     = element - 1;
-		envOscSent_[ lane ]  = -1.0f;
-		return FF_SUCCESS;
-	}
-
 	case PT_BARS_GEN:
 		generatorBars_ = std::clamp( static_cast< int >( std::lround( value ) ), 1, 8 );
 		return FF_SUCCESS;
@@ -594,11 +561,6 @@ float MidiRollPlugin::GetFloatParameter( unsigned int index )
 		return 0.0f;
 	case PT_TEST_LANE:
 		return static_cast< float >( testLane_ );
-	case PT_ENV1_DIAL:
-	case PT_ENV2_DIAL:
-	case PT_ENV3_DIAL:
-	case PT_ENV4_DIAL:
-		return static_cast< float >( envDial_[ index - PT_ENV1_DIAL ] + 1 );
 	case PT_BARS_GEN:
 		return static_cast< float >( generatorBars_ );
 	case PT_DENSITY:
@@ -959,7 +921,6 @@ void MidiRollPlugin::StopAll()
 	midi_.AllNotesOff();
 	envelopes_.Reset();
 	envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
-	envOscSent_[ 0 ] = envOscSent_[ 1 ] = envOscSent_[ 2 ] = envOscSent_[ 3 ] = -1.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -991,26 +952,6 @@ void MidiRollPlugin::PushEnvelopeParams()
 				midi_.ControlChange( CcChannel(), kCcBase + lane, ccValue );
 			}
 		}
-
-		// Direct OSC path: no MIDI learn, no shortcut preset. Resolume only
-		// needs OSC input enabled. The dial is a composition dashboard dial.
-		const int dial = envDial_[ lane ];
-		if( dial >= 0 && osc_.IsOpen() )
-		{
-			if( std::fabs( value - envOscSent_[ lane ] ) > 0.002f )
-			{
-				envOscSent_[ lane ] = value;
-
-				char address[ 64 ] = {};
-				std::snprintf( address, sizeof( address ), "/composition/dashboard/link%d", dial + 1 );
-				osc_.SendFloat( address, value );
-			}
-		}
-
-		// REST path: works with the webserver that the editor already uses, so
-		// no OSC input or MIDI learn is required.
-		if( dial >= 0 )
-			dashboardRest_.SetDial( dial, value );
 	}
 }
 
