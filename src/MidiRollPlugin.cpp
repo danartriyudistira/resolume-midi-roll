@@ -224,6 +224,7 @@ MidiRollPlugin::MidiRollPlugin()
 	}
 
 	osc_.Open( 7000 );
+	dashboardRest_.Start();
 
 	// Seed the constrained randomizer once per instance.
 	rngState_ = static_cast< unsigned int >(
@@ -238,6 +239,7 @@ MidiRollPlugin::MidiRollPlugin()
 MidiRollPlugin::~MidiRollPlugin()
 {
 	StopAll();
+	dashboardRest_.Stop();
 	osc_.Close();
 	midi_.Close();
 	midiroll::BridgeServer::Instance().Release();
@@ -1000,6 +1002,11 @@ void MidiRollPlugin::PushEnvelopeParams()
 				osc_.SendFloat( address, value );
 			}
 		}
+
+		// REST path: works with the webserver that the editor already uses, so
+		// no OSC input or MIDI learn is required.
+		if( dial >= 0 )
+			dashboardRest_.SetDial( dial, value );
 	}
 }
 

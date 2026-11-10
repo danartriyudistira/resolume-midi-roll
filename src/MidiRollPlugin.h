@@ -5,6 +5,7 @@
 #include "EnvelopeEngine.h"
 #include "MidiOut.h"
 #include "OscOut.h"
+#include "DashboardRest.h"
 
 #include <chrono>
 #include <string>
@@ -170,6 +171,7 @@ private:
 	midiroll::EnvelopeEngine envelopes_;
 	midiroll::MidiOut midi_;
 	midiroll::OscOut osc_;
+	midiroll::DashboardRest dashboardRest_;
 
 	// --- Host transport ----------------------------------------------------
 	double hostTime_         = 0.0;

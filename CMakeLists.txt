@@ -26,6 +26,7 @@ add_library(MidiRoll SHARED
 	src/EnvelopeEngine.cpp
 	src/MidiOut.cpp
 	src/OscOut.cpp
+	src/DashboardRest.cpp
 	src/BridgeServer.cpp
 	src/BrowserLauncher.cpp
 	"${FFGL_ROOT}/source/lib/FFGLSDK.cpp"
@@ -35,7 +36,7 @@ target_include_directories(MidiRoll PRIVATE
 	"${CMAKE_CURRENT_SOURCE_DIR}/src"
 	"${FFGL_ROOT}/source/lib")
 
-target_link_libraries(MidiRoll PRIVATE glew_static opengl32 winmm ws2_32 shell32 ole32)
+target_link_libraries(MidiRoll PRIVATE glew_static opengl32 winmm ws2_32 winhttp shell32 ole32)
 
 # The vendored GLEW static lib was built against the static CRT. We build with
 # the DLL CRT (required for host plugins), so drop the static CRT default lib

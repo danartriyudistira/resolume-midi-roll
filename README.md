@@ -442,30 +442,33 @@ Alur live: putar Genre/Template/Root/Scale/Bars dan Density di Dashboard, tekan
 **Random** di panel sampai pola cocok, **Previous** kalau meleset. Detail note
 diedit di web lewat **Edit Mode**.
 
-### Env sebagai penggerak Dashboard (OSC, tanpa MIDI)
+### Env sebagai penggerak Dashboard (otomatis)
 
 Cara paling sederhana: pilih rotary tujuan langsung dari panel Midi Roll.
 
-1. Di Resolume: **Preferences → OSC** → aktifkan **OSC Input**, port **7000**.
-2. Di effect Midi Roll, set:
+1. Di effect Midi Roll, set:
    - `Env 1 Dial = Dial 1`
    - `Env 2 Dial = Dial 2`
    - `Env 3 Dial = Dial 3`
    - `Env 4 Dial = Dial 4`
-3. Buka **Composition Dashboard** (bukan clip/layer dashboard).
-4. Drag parameter warna ke rotary yang sesuai, mis. `Hue Rotate` → Dial 1.
-5. Play clip. Env 1–4 langsung menggerakkan Dial 1–4.
+2. Buka **Composition Dashboard** (bukan clip/layer dashboard).
+3. Drag parameter warna ke rotary yang sesuai, mis. `Hue Rotate` → Dial 1.
+4. Play clip. Env 1–4 langsung menggerakkan Dial 1–4.
 
-Plugin mengirim OSC ke `/composition/dashboard/link1` … `link8` setiap kali nilai
-Env berubah. Tidak ada MIDI learn, tidak ada Shortcut Preset, dan loopMIDI tidak
-dipakai untuk jalur ini.
+Plugin menulis nilai Env ke dial composition lewat **REST API Resolume**
+(`127.0.0.1:8080`), API yang sama yang dipakai editor web. Tidak perlu MIDI
+learn, Shortcut Preset, loopMIDI, atau mengaktifkan OSC.
+
+Kalau webserver Resolume dimatikan, plugin juga mengirim OSC ke
+`/composition/dashboard/link1` … `link8` sebagai cadangan; aktifkan **OSC Input**
+(port 7000) untuk jalur itu.
 
 **Penting:** jangan drag parameter **Env** ke dashboard. Itu membuat dial
-mengontrol Env (arah terbalik). Yang benar: dial **digerakkan oleh OSC** dari
-plugin, lalu parameter warna yang di-link ke dial.
+mengontrol Env (arah terbalik). Yang benar: dial **digerakkan oleh plugin**, lalu
+parameter warna yang di-link ke dial.
 
 Kalau memakai dashboard **clip** atau **layer**, gunakan jalur MIDI CC di bawah;
-alamat OSC-nya membutuhkan nomor layer/clip yang tidak diketahui plugin.
+alamat REST/OSC-nya membutuhkan nomor layer/clip yang tidak diketahui plugin.
 
 ### Env sebagai penggerak Dashboard (CC)
 
