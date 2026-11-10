@@ -230,9 +230,8 @@ bawaan: genre 0 Techno, 1 House, 2 Trance, 3 Drum & Bass, 4 Hip-Hop; template
 `--scale N` (0–5), `--bars N` (1–8), `--progression "A D A G"`, dan
 `--density N` (0–1) menguji nada dasar, scale, panjang, progresi, dan kepadatan.
 Tambahkan `--random` untuk variasi acak terkendali dan `--previous` untuk menguji
-tombol Previous setelah Load/Random. `--cc-channel N` (0 = sama dengan Midi
-Channel, 1–16 = channel eksplisit) menguji routing CC. Harness mencetak
-`Root/Scale`, `Bars/Density`, `Progression`, dan `Notes`.
+tombol Previous setelah Load/Random. Harness mencetak `Root/Scale`,
+`Bars/Density`, `Progression`, dan `Notes`.
 
 ## Peta parameter
 
@@ -259,7 +258,6 @@ Channel, 1–16 = channel eksplisit) menguji routing CC. Harness mencetak
 | 21 | Load | event | memuat template + menyimpan snapshot ke history |
 | 22 | Random | event | variasi acak + menyimpan snapshot ke history |
 | 23 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
-| 24 | CC Channel | option | **disembunyikan**; CC tetap mengikuti Midi Channel |
 
 ### Panel Resolume
 
@@ -447,8 +445,7 @@ Env tidak menjadi dial itu sendiri — Env **menggerakkan** dial lewat MIDI.
 Env 1..4 → CC 21..24 (loopMIDI) → MIDI shortcut → Dashboard dial → parameter warna
 ```
 
-- CC selalu dikirim di channel yang sama dengan note. `CC Channel` disembunyikan
-  dari panel; nilai lamanya tetap disimpan untuk kompatibilitas preset.
+- CC selalu dikirim di channel yang sama dengan note.
 - CC hanya dikirim saat nilainya berubah; setelah port/channel diganti, plugin
   mengirim ulang nilai saat ini.
 

@@ -262,7 +262,6 @@ int main( int argc, char** argv )
 	std::string progression;
 	bool randomize       = false;
 	bool previous        = false;
-	int ccChannel        = 0;
 	std::string notesJson;
 	std::string portHint = "loopmidi";
 
@@ -282,8 +281,6 @@ int main( int argc, char** argv )
 			randomize = true;
 		else if( std::strcmp( argv[ i ], "--previous" ) == 0 )
 			previous = true;
-		else if( std::strcmp( argv[ i ], "--cc-channel" ) == 0 && i + 1 < argc )
-			ccChannel = std::atoi( argv[ ++i ] );
 		else if( std::strcmp( argv[ i ], "--root" ) == 0 && i + 1 < argc )
 			rootIndex = std::atoi( argv[ ++i ] );
 		else if( std::strcmp( argv[ i ], "--scale" ) == 0 && i + 1 < argc )
@@ -448,7 +445,6 @@ int main( int argc, char** argv )
 	SetFloat( 1, 16.0f );   // Midi Channel = 16
 	SetFloat( 2, division ); // Length: 4, 8, 16 or 32
 	SetFloat( 3, 0.30f );   // Decay ~0.93 s
-	SetFloat( 24, static_cast< float >( ccChannel ) ); // CC Channel: 0 = same as Midi
 
 	if( !notesJson.empty() )
 		SetText( 10, notesJson.c_str() ); // Notes (free note list)

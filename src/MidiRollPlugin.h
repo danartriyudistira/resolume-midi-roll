@@ -70,7 +70,6 @@ private:
 		PT_LOAD_V2,
 		PT_RANDOM_V2,
 		PT_PREVIOUS,
-		PT_CC_CHANNEL,
 		PT_COUNT
 	};
 
@@ -105,7 +104,6 @@ private:
 	void ScheduleNoteOff( int note, int lane, float delaySeconds, int channel );
 	void FlushNoteOffs( float deltaSeconds );
 	void PushEnvelopeParams();
-	int CcChannel() const;
 	void OpenConfiguredPort();
 	void StopAll();
 
@@ -209,9 +207,6 @@ private:
 
 	float envPushed_[ kLanes ] = {};
 	int envCcSent_[ kLanes ]   = { -1, -1, -1, -1 };
-
-	// 0 = same channel as the notes, 1..16 = explicit CC channel.
-	int ccChannelElement_      = 0;
 
 	float pattern_[ kLanes ][ kMaxSteps ] = {};
 

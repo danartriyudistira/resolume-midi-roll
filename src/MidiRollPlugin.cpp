@@ -184,22 +184,6 @@ MidiRollPlugin::MidiRollPlugin()
 	SetParamInfo( PT_RANDOM_V2, "Random", FF_TYPE_EVENT, false );
 	SetParamInfo( PT_PREVIOUS, "Previous", FF_TYPE_EVENT, false );
 
-	// --- Envelope CC routing ----------------------------------------------
-	// Notes and CC can use different channels: keep the synth on the note
-	// channel and send the envelope CCs to Resolume on another channel.
-	// Element 0 preserves the old behaviour (CC follows Midi Channel).
-	SetOptionParamInfo( PT_CC_CHANNEL, "CC Channel", 17, 0.0f );
-	SetParamElementInfo( PT_CC_CHANNEL, 0, "Same as Midi", 0.0f );
-	for( int i = 0; i < 16; ++i )
-	{
-		const std::string label = "Channel " + std::to_string( i + 1 );
-		SetParamElementInfo( PT_CC_CHANNEL, static_cast< unsigned int >( i + 1 ), label.c_str(), static_cast< float >( i + 1 ) );
-	}
-
-	// CC routing is fixed to "Same as Midi"; keep the parameter for preset
-	// compatibility but hide it from the panel.
-	SetParamVisibility( PT_CC_CHANNEL, false, false );
-
 	// Seed the constrained randomizer once per instance.
 	rngState_ = static_cast< unsigned int >(
 		std::chrono::steady_clock::now().time_since_epoch().count() ) | 1u;
@@ -465,15 +449,6 @@ FFResult MidiRollPlugin::SetFloatParameter( unsigned int index, float value )
 			RestorePrevious();
 		return FF_SUCCESS;
 
-	case PT_CC_CHANNEL:
-	{
-		const int element = static_cast< int >( std::lround( value ) );
-		ccChannelElement_ = std::clamp( element, 0, 16 );
-		// Force the next frame to resend on the new channel.
-		envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
-		return FF_SUCCESS;
-	}
-
 	case PT_BARS_GEN:
 		generatorBars_ = std::clamp( static_cast< int >( std::lround( value ) ), 1, 8 );
 		return FF_SUCCESS;
@@ -529,8 +504,6 @@ float MidiRollPlugin::GetFloatParameter( unsigned int index )
 		return 0.0f;
 	case PT_PREVIOUS:
 		return 0.0f;
-	case PT_CC_CHANNEL:
-		return static_cast< float >( ccChannelElement_ );
 	case PT_BARS_GEN:
 		return static_cast< float >( generatorBars_ );
 	case PT_DENSITY:
@@ -916,15 +889,10 @@ void MidiRollPlugin::PushEnvelopeParams()
 			if( ccValue != envCcSent_[ lane ] )
 			{
 				envCcSent_[ lane ] = ccValue;
-				midi_.ControlChange( CcChannel(), kCcBase + lane, ccValue );
+				midi_.ControlChange( midiChannel_, kCcBase + lane, ccValue );
 			}
 		}
 	}
-}
-
-int MidiRollPlugin::CcChannel() const
-{
-	return ccChannelElement_ > 0 ? ccChannelElement_ - 1 : midiChannel_;
 }
 
 void MidiRollPlugin::OpenConfiguredPort()
