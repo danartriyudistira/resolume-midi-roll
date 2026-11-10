@@ -196,7 +196,7 @@ MidiRollPlugin::MidiRollPlugin()
 		SetParamElementInfo( PT_CC_CHANNEL, static_cast< unsigned int >( i + 1 ), label.c_str(), static_cast< float >( i + 1 ) );
 	}
 
-	// Sends a slow 0..127..0 sweep on CC 21..24 for MIDI learn.
+	// Toggles a continuous 0..127..0 sweep on CC 21..24 for MIDI learn.
 	SetParamInfo( PT_TEST_CC, "Test CC", FF_TYPE_EVENT, false );
 
 	// Seed the constrained randomizer once per instance.
@@ -476,8 +476,11 @@ FFResult MidiRollPlugin::SetFloatParameter( unsigned int index, float value )
 	case PT_TEST_CC:
 		if( value >= 0.5f )
 		{
-			ccTestRemaining_ = kCcTestSeconds;
-			ccTestElapsed_   = 0.0f;
+			ccTestActive_  = !ccTestActive_;
+			ccTestElapsed_ = 0.0f;
+
+			if( !ccTestActive_ )
+				envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
 		}
 		return FF_SUCCESS;
 
@@ -895,8 +898,8 @@ void MidiRollPlugin::StopAll()
 {
 	lastStep_     = -1;
 	pendingCount_ = 0;
-	ccTestRemaining_ = 0.0f;
-	ccTestElapsed_   = 0.0f;
+	ccTestActive_ = false;
+	ccTestElapsed_ = 0.0f;
 	midi_.AllNotesOff();
 	envelopes_.Reset();
 	envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
@@ -922,7 +925,7 @@ void MidiRollPlugin::PushEnvelopeParams()
 			RaiseParamEvent( kParamIds[ lane ], FF_EVENT_FLAG_VALUE );
 		}
 
-		if( !midi_.IsOpen() || ccTestRemaining_ > 0.0f )
+		if( !midi_.IsOpen() || ccTestActive_ )
 			continue;
 
 		const int ccValue = static_cast< int >( std::lround( value * 127.0f ) );
@@ -941,10 +944,9 @@ int MidiRollPlugin::CcChannel() const
 
 void MidiRollPlugin::UpdateCcTest( float deltaSeconds )
 {
-	if( ccTestRemaining_ <= 0.0f )
+	if( !ccTestActive_ )
 		return;
 
-	ccTestRemaining_ = std::max( 0.0f, ccTestRemaining_ - deltaSeconds );
 	ccTestElapsed_ += deltaSeconds;
 
 	if( midi_.IsOpen() )
@@ -963,13 +965,6 @@ void MidiRollPlugin::UpdateCcTest( float deltaSeconds )
 			const int ccValue    = static_cast< int >( std::lround( triangle * 127.0f ) );
 			midi_.ControlChange( channel, kCcBase + lane, ccValue );
 		}
-	}
-
-	if( ccTestRemaining_ <= 0.0f )
-	{
-		// Hand the CC stream back to the envelopes and force a resend so the
-		// mapped dials snap to the current envelope values.
-		envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
 	}
 }
 

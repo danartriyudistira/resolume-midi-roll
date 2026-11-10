@@ -80,7 +80,6 @@ private:
 	static constexpr int kLanes          = midiroll::EnvelopeEngine::kLanes;
 	static constexpr int kBaseNote       = 36;
 	static constexpr int kCcBase         = 21;
-	static constexpr float kCcTestSeconds = 3.2f;
 	static constexpr int kMaxPendingOffs = 64;
 	static constexpr int kMaxNotes       = 128;
 	static constexpr float kBeatsPerBar  = 4.0f;
@@ -107,9 +106,8 @@ private:
 	void ScheduleNoteOff( int note, int lane, float delaySeconds, int channel );
 	void FlushNoteOffs( float deltaSeconds );
 	void PushEnvelopeParams();
-	// Sweeps CC 21..24 so the user can MIDI-learn a dashboard dial without
-	// waiting for a note. Runs for kCcTestSeconds, then hands the CC stream
-	// back to the envelopes.
+	// Toggles a continuous CC 21..24 sweep so the user can MIDI-learn a
+	// dashboard dial without waiting for a note. Press again to stop.
 	void UpdateCcTest( float deltaSeconds );
 	int CcChannel() const;
 	void OpenConfiguredPort();
@@ -218,7 +216,7 @@ private:
 
 	// 0 = same channel as the notes, 1..16 = explicit CC channel.
 	int ccChannelElement_      = 0;
-	float ccTestRemaining_     = 0.0f;
+	bool ccTestActive_         = false;
 	float ccTestElapsed_       = 0.0f;
 
 	float pattern_[ kLanes ][ kMaxSteps ] = {};

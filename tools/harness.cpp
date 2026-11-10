@@ -579,7 +579,8 @@ int main( int argc, char** argv )
 	{
 		std::lock_guard< std::mutex > lock( g_midiMutex );
 		const size_t shown = std::min< size_t >( g_midiLog.size(), 10 );
-		for( size_t i = 0; i < shown; ++i )
+		const size_t start = g_midiLog.size() - shown;
+		for( size_t i = start; i < g_midiLog.size(); ++i )
 			std::printf( "  %s\n", g_midiLog[ i ].c_str() );
 	}
 

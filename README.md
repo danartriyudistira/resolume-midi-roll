@@ -261,7 +261,7 @@ dan sweep MIDI learn. Harness mencetak `Root/Scale`, `Bars/Density`,
 | 22 | Random | event | variasi acak + menyimpan snapshot ke history |
 | 23 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
 | 24 | CC Channel | option | `Same as Midi` atau `Channel 1`–`Channel 16` untuk CC 21–24 |
-| 25 | Test CC | event | sweep CC 21–24 selama 3,2 detik untuk MIDI learn |
+| 25 | Test CC | event | toggle sweep CC 21–24 untuk MIDI learn |
 
 ### Panel Resolume
 
@@ -452,8 +452,9 @@ Env 1..4 → CC 21..24 (loopMIDI) → MIDI shortcut → Dashboard dial → param
 - **CC Channel** memisahkan channel CC dari channel note. Contoh: note ke synth
   di `Channel 1`, CC ke Resolume di `Channel 16`. Default `Same as Midi`
   mempertahankan perilaku lama.
-- **Test CC** mengirim sweep 0→127→0 pada CC 21–24 selama 3,2 detik. Pakai ini
-  saat MIDI learn supaya tidak perlu menunggu note berbunyi.
+- **Test CC** adalah toggle: tekan sekali untuk mulai sweep 0→127→0 pada CC 21–24,
+  tekan lagi untuk berhenti. Tekan **sebelum** masuk MIDI map mode — di map mode,
+  klik tombol hanya memilih tombol itu, bukan menjalankannya.
 - CC hanya dikirim saat nilainya berubah; setelah port/channel diganti, plugin
   mengirim ulang nilai saat ini.
 
@@ -462,13 +463,16 @@ Langkah mapping:
 1. Aktifkan `loopMIDI Port` sebagai MIDI Input di Preferences Resolume.
 2. Di Midi Roll: `Midi Port = loopMIDI Port`, `Midi Channel` untuk note, dan
    `CC Channel` untuk CC (mis. `Channel 16`).
-3. Masuk MIDI shortcut mode, klik dial Dashboard yang dituju.
-4. Tekan **Test CC**. Resolume menangkap CC 21 (Env 1). Set mode **Absolute**.
-5. Untuk Env 2–4, ubah nomor CC di panel shortcut menjadi 22/23/24.
-6. Drag parameter warna ke dial yang sama: `Hue Rotate`, `Colorize` → `Hue`,
+3. Tekan **Test CC** (sweep mulai berjalan).
+4. Masuk MIDI shortcut mode, klik dial Dashboard yang dituju. Resolume
+   menangkap CC 21 (Env 1).
+5. Set mode **Absolute**, lalu keluar dari map mode.
+6. Tekan **Test CC** lagi untuk menghentikan sweep.
+7. Untuk Env 2–4, ubah nomor CC di panel shortcut menjadi 22/23/24.
+8. Drag parameter warna ke dial yang sama: `Hue Rotate`, `Colorize` → `Hue`,
    atau `Add/Subtract` → `R`/`G`/`B`.
-7. Atur **In/Out**, **Invert**, dan **Dial Range** per parameter.
-8. Simpan **Shortcut Preset** — mapping MIDI tidak ikut tersimpan di `.avc`.
+9. Atur **In/Out**, **Invert**, dan **Dial Range** per parameter.
+10. Simpan **Shortcut Preset** — mapping MIDI tidak ikut tersimpan di `.avc`.
 
 Satu CC yang sama boleh di-map ke beberapa dial sekaligus: dial clip, dial layer,
 dan dial composition. Dengan begitu satu Env bisa memodulasi warna di beberapa
