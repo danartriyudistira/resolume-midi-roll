@@ -22,3 +22,6 @@ Thumbs.db
 
 # Local logs
 *.log
+
+# Release archives
+*.zip
