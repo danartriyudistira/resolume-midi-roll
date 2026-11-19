@@ -36,9 +36,6 @@ namespace midiroll
 		// GUI -> Plugin. Returns true once per accepted change.
 		bool Consume( int slot, std::string& pattern );
 
-		// Current contents of a slot without touching its dirty flag.
-		std::string Peek( int slot ) const;
-
 		// Note value of one step, so the editor can label the grid.
 		void SetDivision( const std::string& label );
 

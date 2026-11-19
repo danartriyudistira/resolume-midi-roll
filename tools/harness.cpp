@@ -262,7 +262,8 @@ int main( int argc, char** argv )
 	std::string progression;
 	bool randomize       = false;
 	bool previous        = false;
-	int env1Dial         = 0;
+	std::string envOsc[ 4 ];
+	int oscEnable        = 1;
 	std::string notesJson;
 	std::string portHint = "loopmidi";
 
@@ -282,8 +283,16 @@ int main( int argc, char** argv )
 			randomize = true;
 		else if( std::strcmp( argv[ i ], "--previous" ) == 0 )
 			previous = true;
-		else if( std::strcmp( argv[ i ], "--env1-dial" ) == 0 && i + 1 < argc )
-			env1Dial = std::atoi( argv[ ++i ] );
+		else if( std::strcmp( argv[ i ], "--env1-osc" ) == 0 && i + 1 < argc )
+			envOsc[ 0 ] = argv[ ++i ];
+		else if( std::strcmp( argv[ i ], "--env2-osc" ) == 0 && i + 1 < argc )
+			envOsc[ 1 ] = argv[ ++i ];
+		else if( std::strcmp( argv[ i ], "--env3-osc" ) == 0 && i + 1 < argc )
+			envOsc[ 2 ] = argv[ ++i ];
+		else if( std::strcmp( argv[ i ], "--env4-osc" ) == 0 && i + 1 < argc )
+			envOsc[ 3 ] = argv[ ++i ];
+		else if( std::strcmp( argv[ i ], "--osc-enable" ) == 0 && i + 1 < argc )
+			oscEnable = std::atoi( argv[ ++i ] );
 		else if( std::strcmp( argv[ i ], "--root" ) == 0 && i + 1 < argc )
 			rootIndex = std::atoi( argv[ ++i ] );
 		else if( std::strcmp( argv[ i ], "--scale" ) == 0 && i + 1 < argc )
@@ -446,25 +455,35 @@ int main( int argc, char** argv )
 	if( outputIndex >= 0 )
 		SetFloat( 0, static_cast< float >( outputIndex + 1 ) ); // Midi Port
 	SetFloat( 1, 16.0f );   // Midi Channel = 16
-	SetFloat( 2, division ); // Length: 4, 8, 16 or 32
-	SetFloat( 3, 0.30f );   // Decay ~0.93 s
-	SetFloat( 6, static_cast< float >( env1Dial ) ); // Env 1 Dial: 0 = Off, 1..8
+	SetFloat( 32, division ); // Length (hidden): 4, 8, 16 or 32
+	SetFloat( 14, 0.30f );  // Decay ~0.93 s
+
+	static const unsigned int kOscText[ 4 ] = { 16, 19, 22, 25 };
+	static const unsigned int kOscEnable[ 4 ] = { 17, 20, 23, 26 };
+
+	for( int lane = 0; lane < 4; ++lane )
+	{
+		if( !envOsc[ lane ].empty() )
+			SetText( kOscText[ lane ], envOsc[ lane ].c_str() );
+
+		SetFloat( kOscEnable[ lane ], static_cast< float >( oscEnable ) );
+	}
 
 	if( !notesJson.empty() )
-		SetText( 11, notesJson.c_str() ); // Notes (free note list)
+		SetText( 31, notesJson.c_str() ); // Notes (visible data)
 
 	if( templateIndex >= 0 )
 	{
-		SetFloat( 13, static_cast< float >( rootIndex ) );    // Root
-		SetFloat( 14, static_cast< float >( scaleIndex ) );   // Scale
-		SetFloat( 15, static_cast< float >( genreIndex ) );   // Genre
-		SetFloat( 16, static_cast< float >( templateIndex ) ); // Template
-		SetFloat( 19, static_cast< float >( generatorBars ) ); // Bars
-		SetText( 20, progression.c_str() );                   // Progression
-		SetFloat( 21, density );                              // Density
-		SetFloat( randomize ? 23 : 22, 1.0f );                 // Random / Load
+		SetFloat( 4, static_cast< float >( rootIndex ) );    // Root
+		SetFloat( 5, static_cast< float >( scaleIndex ) );   // Scale
+		SetFloat( 6, static_cast< float >( genreIndex ) );   // Genre
+		SetFloat( 7, static_cast< float >( templateIndex ) ); // Template
+		SetFloat( 8, static_cast< float >( generatorBars ) ); // Bars
+		SetText( 9, progression.c_str() );                   // Progression
+		SetFloat( 10, density );                              // Density
+		SetFloat( randomize ? 12 : 11, 1.0f );                 // Random / Load
 		if( previous )
-			SetFloat( 24, 1.0f );                              // Previous
+			SetFloat( 13, 1.0f );                              // Previous
 	}
 
 	// --- Run --------------------------------------------------------------
@@ -513,7 +532,7 @@ int main( int argc, char** argv )
 				return -1;
 			}
 
-			static const unsigned int kEnvIndex[ 4 ] = { 5, 7, 8, 9 };
+			static const unsigned int kEnvIndex[ 4 ] = { 15, 18, 21, 24 };
 
 			for( int lane = 0; lane < 4; ++lane )
 				envMax[ lane ] = std::max( envMax[ lane ], GetFloat( kEnvIndex[ lane ] ) );
@@ -540,15 +559,15 @@ int main( int argc, char** argv )
 
 	// Read the mirrored parameters before tearing the instance down.
 	const bool captureParams = !notesJson.empty() || templateIndex >= 0 || randomize;
-	const std::string finalNotes = captureParams ? GetText( 10 ) : std::string();
-	const float finalRoot = captureParams ? GetFloat( 13 ) : 0.0f;
-	const float finalScale = captureParams ? GetFloat( 14 ) : 0.0f;
-	const float finalBars = captureParams ? GetFloat( 19 ) : 0.0f;
-	const float finalDensity = captureParams ? GetFloat( 21 ) : 0.0f;
-	const std::string finalProgression = captureParams ? GetText( 20 ) : std::string();
+	const std::string finalNotes = captureParams ? GetText( 31 ) : std::string();
+	const float finalRoot = captureParams ? GetFloat( 4 ) : 0.0f;
+	const float finalScale = captureParams ? GetFloat( 5 ) : 0.0f;
+	const float finalBars = captureParams ? GetFloat( 8 ) : 0.0f;
+	const float finalDensity = captureParams ? GetFloat( 10 ) : 0.0f;
+	const std::string finalProgression = captureParams ? GetText( 9 ) : std::string();
 
 	int envVisible[ 4 ] = { -1, -1, -1, -1 };
-	static const unsigned int kEnvIndex[ 4 ] = { 5, 7, 8, 9 };
+	static const unsigned int kEnvIndex[ 4 ] = { 15, 18, 21, 24 };
 	for( int lane = 0; lane < 4; ++lane )
 		envVisible[ lane ] = GetVisibility( kEnvIndex[ lane ] );
 

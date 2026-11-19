@@ -26,7 +26,6 @@ namespace midiroll
 		void Close();
 
 		bool IsOpen() const;
-		int OpenIndex() const;
 
 		void NoteOn( int channel, int note, int velocity );
 		void NoteOff( int channel, int note );
@@ -43,7 +42,6 @@ namespace midiroll
 
 		std::vector< Device > devices_;
 		void* handle_          = nullptr;
-		int openIndex_         = -1;
 		bool activeNotes_[ 16 ][ 128 ] = {};
 	};
 }

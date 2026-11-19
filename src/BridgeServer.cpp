@@ -446,15 +446,6 @@ namespace midiroll
 		return true;
 	}
 
-	std::string BridgeServer::Peek( int slot ) const
-	{
-		if( slot < 0 || slot >= kSlots )
-			return std::string( kPatternLength, '0' );
-
-		std::lock_guard< std::mutex > lock( mutex_ );
-		return slots_[ slot ];
-	}
-
 	void BridgeServer::SetDivision( const std::string& label )
 	{
 		std::lock_guard< std::mutex > lock( mutex_ );

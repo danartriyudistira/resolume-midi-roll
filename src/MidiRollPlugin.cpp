@@ -99,21 +99,27 @@ MidiRollPlugin::MidiRollPlugin()
 	SetParamInfo( PT_EDIT_MODE, "Edit Mode", FF_TYPE_EVENT, false );
 
 	// --- Envelope outputs --------------------------------------------------
-	SetParamInfo( PT_ENV1, "Env 1", FF_TYPE_STANDARD, 0.0f );
+	// Each envelope has its own OSC address and enable checkbox, interleaved
+	// so the controls sit directly below the matching Env slider.
+	static const unsigned int kEnvIds[ kLanes ] = { PT_ENV1, PT_ENV2, PT_ENV3, PT_ENV4 };
+	static const unsigned int kOscIds[ kLanes ] = { PT_ENV1_OSC, PT_ENV2_OSC, PT_ENV3_OSC, PT_ENV4_OSC };
+	static const unsigned int kEnableIds[ kLanes ] = { PT_OSC1_ENABLE, PT_OSC2_ENABLE, PT_OSC3_ENABLE, PT_OSC4_ENABLE };
 
-	// Sits between Env 1 and Env 2: choose which composition dashboard rotary
-	// Env 1 drives over OSC.
-	SetOptionParamInfo( PT_ENV1_DIAL, "Env 1 Dial", 9, 0.0f );
-	SetParamElementInfo( PT_ENV1_DIAL, 0, "Off", 0.0f );
-	for( int dial = 0; dial < 8; ++dial )
+	for( int lane = 0; lane < kLanes; ++lane )
 	{
-		const std::string label = "Dial " + std::to_string( dial + 1 );
-		SetParamElementInfo( PT_ENV1_DIAL, static_cast< unsigned int >( dial + 1 ), label.c_str(), static_cast< float >( dial + 1 ) );
+		const std::string envName    = "Env " + std::to_string( lane + 1 );
+		const std::string oscName    = "Env " + std::to_string( lane + 1 ) + " OSC";
+		const std::string enableName = "OSC " + std::to_string( lane + 1 ) + " Enable";
+
+		SetParamInfo( kEnvIds[ lane ], envName.c_str(), FF_TYPE_STANDARD, 0.0f );
+		SetParamInfo( kOscIds[ lane ], oscName.c_str(), FF_TYPE_TEXT, envOscAddress_[ lane ].c_str() );
+		SetParamInfo( kEnableIds[ lane ], enableName.c_str(), FF_TYPE_BOOLEAN, 1.0f );
 	}
 
-	SetParamInfo( PT_ENV2, "Env 2", FF_TYPE_STANDARD, 0.0f );
-	SetParamInfo( PT_ENV3, "Env 3", FF_TYPE_STANDARD, 0.0f );
-	SetParamInfo( PT_ENV4, "Env 4", FF_TYPE_STANDARD, 0.0f );
+	SetParamInfo( PT_CONFIRM_OVERWRITE, "Allow Overwrite", FF_TYPE_BOOLEAN, false );
+	SetParamInfo( PT_SET_OSC_CLIP, "OSC from Clip", FF_TYPE_EVENT, false );
+	SetParamInfo( PT_SET_OSC_COMPOSITION, "OSC Composition", FF_TYPE_EVENT, false );
+	SetParamInfo( PT_SET_OSC_LAYER, "OSC Layer", FF_TYPE_EVENT, false );
 
 	// No default groove: a freshly added Midi Roll is silent. Users pick a
 	// template from the effect panel or draw notes in the piano roll.
@@ -129,6 +135,9 @@ MidiRollPlugin::MidiRollPlugin()
 	// Free note list from the piano roll: [[pitch, step, length, velocity], ...]
 	// Empty means "fall back to the legacy 4 lane pattern".
 	SetParamInfo( PT_NOTES, "Notes", FF_TYPE_TEXT, "" );
+
+	// Pattern is legacy data plumbing; Notes stays visible for the web editor.
+	SetParamVisibility( PT_PATTERN, false, false );
 
 	// Shift note timing to compensate for latency further down the chain
 	// (loopMIDI, DAW buffer, synth). 0.5 is neutral.
@@ -200,6 +209,7 @@ MidiRollPlugin::MidiRollPlugin()
 		std::chrono::steady_clock::now().time_since_epoch().count() ) | 1u;
 
 	osc_.Open( 7000 );
+	oscResolver_.Start();
 	midiroll::BridgeServer::Instance().Acquire();
 	PublishCurrentPattern();
 
@@ -209,9 +219,10 @@ MidiRollPlugin::MidiRollPlugin()
 MidiRollPlugin::~MidiRollPlugin()
 {
 	StopAll();
+	oscResolver_.Stop();
+	midiroll::BridgeServer::Instance().Release();
 	osc_.Close();
 	midi_.Close();
-	midiroll::BridgeServer::Instance().Release();
 }
 
 // ---------------------------------------------------------------------------
@@ -423,13 +434,39 @@ FFResult MidiRollPlugin::SetFloatParameter( unsigned int index, float value )
 		// applies our value change events; ignore them.
 		return FF_SUCCESS;
 
-	case PT_ENV1_DIAL:
+	case PT_OSC1_ENABLE:
+	case PT_OSC2_ENABLE:
+	case PT_OSC3_ENABLE:
+	case PT_OSC4_ENABLE:
 	{
-		const int element = std::clamp( static_cast< int >( std::lround( value ) ), 0, 8 );
-		env1Dial_     = element - 1;
-		env1OscSent_  = -1.0f;
+		int lane = 0;
+		if( index == PT_OSC2_ENABLE ) lane = 1;
+		else if( index == PT_OSC3_ENABLE ) lane = 2;
+		else if( index == PT_OSC4_ENABLE ) lane = 3;
+
+		oscEnabled_[ lane ].store( value >= 0.5f );
+		resetOscSent_.store( true );
 		return FF_SUCCESS;
 	}
+
+	case PT_CONFIRM_OVERWRITE:
+		confirmOverwrite_.store( value >= 0.5f );
+		return FF_SUCCESS;
+
+	case PT_SET_OSC_CLIP:
+		if( value >= 0.5f && ShouldOverwriteOsc() )
+			oscResolver_.RequestClip();
+		return FF_SUCCESS;
+
+	case PT_SET_OSC_COMPOSITION:
+		if( value >= 0.5f && ShouldOverwriteOsc() )
+			ApplyOscAddresses( 0, 0, false );
+		return FF_SUCCESS;
+
+	case PT_SET_OSC_LAYER:
+		if( value >= 0.5f && ShouldOverwriteOsc() )
+			oscResolver_.RequestLayer();
+		return FF_SUCCESS;
 
 	case PT_ROOT:
 		rootIndex_ = std::clamp( static_cast< int >( std::lround( value ) ), 0, 11 );
@@ -501,14 +538,26 @@ float MidiRollPlugin::GetFloatParameter( unsigned int index )
 		return 0.0f;
 	case PT_ENV1:
 		return envelopes_.Value( 0 );
-	case PT_ENV1_DIAL:
-		return static_cast< float >( env1Dial_ + 1 );
+	case PT_OSC1_ENABLE:
+		return oscEnabled_[ 0 ].load() ? 1.0f : 0.0f;
 	case PT_ENV2:
 		return envelopes_.Value( 1 );
+	case PT_OSC2_ENABLE:
+		return oscEnabled_[ 1 ].load() ? 1.0f : 0.0f;
 	case PT_ENV3:
 		return envelopes_.Value( 2 );
+	case PT_OSC3_ENABLE:
+		return oscEnabled_[ 2 ].load() ? 1.0f : 0.0f;
 	case PT_ENV4:
 		return envelopes_.Value( 3 );
+	case PT_OSC4_ENABLE:
+		return oscEnabled_[ 3 ].load() ? 1.0f : 0.0f;
+	case PT_CONFIRM_OVERWRITE:
+		return confirmOverwrite_.load() ? 1.0f : 0.0f;
+	case PT_SET_OSC_CLIP:
+	case PT_SET_OSC_COMPOSITION:
+	case PT_SET_OSC_LAYER:
+		return 0.0f;
 	case PT_GENRE:
 		return static_cast< float >( genreIndex_ );
 	case PT_ROOT:
@@ -570,11 +619,41 @@ FFResult MidiRollPlugin::SetTextParameter( unsigned int index, const char* value
 		return FF_SUCCESS;
 	}
 
+	if( index == PT_ENV1_OSC || index == PT_ENV2_OSC || index == PT_ENV3_OSC || index == PT_ENV4_OSC )
+	{
+		static const unsigned int kOscIds[ kLanes ] = { PT_ENV1_OSC, PT_ENV2_OSC, PT_ENV3_OSC, PT_ENV4_OSC };
+		for( int lane = 0; lane < kLanes; ++lane )
+		{
+			if( index == kOscIds[ lane ] )
+			{
+				std::lock_guard< std::mutex > lock( oscMutex_ );
+				envOscAddress_[ lane ] = value;
+				resetOscSent_.store( true );
+				return FF_SUCCESS;
+			}
+		}
+	}
+
 	return FF_FAIL;
 }
 
 char* MidiRollPlugin::GetTextParameter( unsigned int index )
 {
+	if( index == PT_ENV1_OSC || index == PT_ENV2_OSC || index == PT_ENV3_OSC || index == PT_ENV4_OSC )
+	{
+		int lane = 0;
+		if( index == PT_ENV2_OSC ) lane = 1;
+		else if( index == PT_ENV3_OSC ) lane = 2;
+		else if( index == PT_ENV4_OSC ) lane = 3;
+
+		std::lock_guard< std::mutex > lock( oscMutex_ );
+		const std::string& source = envOscAddress_[ lane ];
+		const size_t length = std::min( source.size(), sizeof( textBuffer_ ) - 1 );
+		std::memcpy( textBuffer_, source.data(), length );
+		textBuffer_[ length ] = '\0';
+		return textBuffer_;
+	}
+
 	const std::string* source = nullptr;
 
 	if( index == PT_PATTERN )
@@ -626,6 +705,31 @@ FFResult MidiRollPlugin::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	DriveSequencer( deltaSeconds );
 	FlushNoteOffs( deltaSeconds );
 	envelopes_.Advance( deltaSeconds );
+
+	midiroll::OscTargetResolver::Result target;
+	if( oscResolver_.Consume( target ) )
+	{
+		if( target.valid )
+			ApplyOscAddresses( target.layer, target.column, target.layerOnly );
+		else
+			FFGLLog::LogToHost( target.reason.c_str() );
+	}
+
+	if( resetOscSent_.exchange( false ) )
+	{
+		envOscSent_[ 0 ] = envOscSent_[ 1 ] = envOscSent_[ 2 ] = envOscSent_[ 3 ] = -1.0f;
+	}
+
+	if( oscAddressDirty_.exchange( false ) )
+	{
+		static const unsigned int kOscIds[ kLanes ] = { PT_ENV1_OSC, PT_ENV2_OSC, PT_ENV3_OSC, PT_ENV4_OSC };
+		for( int lane = 0; lane < kLanes; ++lane )
+			RaiseParamEvent( kOscIds[ lane ], FF_EVENT_FLAG_VALUE );
+	}
+
+	if( confirmDirty_.exchange( false ) )
+		RaiseParamEvent( PT_CONFIRM_OVERWRITE, FF_EVENT_FLAG_VALUE );
+
 	PushEnvelopeParams();
 	PollBridge( deltaSeconds );
 
@@ -798,13 +902,13 @@ void MidiRollPlugin::FireStep( int step, float stepSeconds )
 			if( lane >= 0 )
 			{
 				envelopes_.Trigger( lane, static_cast< float >( note.v ) / 127.0f, decaySeconds_ );
-				ScheduleNoteOff( note.p, lane, stepSeconds * static_cast< float >( note.l ) * 0.9f, midiChannel_ );
+				ScheduleNoteOff( note.p, stepSeconds * static_cast< float >( note.l ) * 0.9f, midiChannel_ );
 			}
 			else
 			{
 				// More distinct pitches than envelope lanes: the note still
 				// plays, it just has no envelope of its own.
-				ScheduleNoteOff( note.p, -1, stepSeconds * static_cast< float >( note.l ) * 0.9f, midiChannel_ );
+				ScheduleNoteOff( note.p, stepSeconds * static_cast< float >( note.l ) * 0.9f, midiChannel_ );
 			}
 		}
 
@@ -829,19 +933,17 @@ void MidiRollPlugin::FireStep( int step, float stepSeconds )
 
 		midi_.NoteOn( midiChannel_, note, static_cast< int >( std::lround( velocity * 127.0f ) ) );
 		envelopes_.Trigger( lane, velocity, decaySeconds_ );
-		ScheduleNoteOff( note, lane, gateDuration, midiChannel_ );
+		ScheduleNoteOff( note, gateDuration, midiChannel_ );
 	}
 }
 
-void MidiRollPlugin::ScheduleNoteOff( int note, int lane, float delaySeconds, int channel )
+void MidiRollPlugin::ScheduleNoteOff( int note, float delaySeconds, int channel )
 {
 	if( pendingCount_ >= kMaxPendingOffs )
 	{
 		// Queue is full: release the oldest note now instead of leaving it stuck.
 		const PendingNoteOff dropped = pendingOffs_[ 0 ];
 		midi_.NoteOff( dropped.channel, dropped.note );
-		if( dropped.lane >= 0 )
-			envelopes_.Release( dropped.lane );
 
 		pendingOffs_[ 0 ] = pendingOffs_[ pendingCount_ - 1 ];
 		--pendingCount_;
@@ -849,7 +951,6 @@ void MidiRollPlugin::ScheduleNoteOff( int note, int lane, float delaySeconds, in
 
 	PendingNoteOff& entry = pendingOffs_[ pendingCount_++ ];
 	entry.note            = note;
-	entry.lane            = lane;
 	entry.channel         = channel;
 	entry.remaining       = delaySeconds;
 }
@@ -868,8 +969,6 @@ void MidiRollPlugin::FlushNoteOffs( float deltaSeconds )
 		}
 
 		midi_.NoteOff( entry.channel, entry.note );
-		if( entry.lane >= 0 )
-			envelopes_.Release( entry.lane );
 
 		// Swap with the tail so removal stays O(1) and order doesn't matter.
 		pendingOffs_[ i ] = pendingOffs_[ pendingCount_ - 1 ];
@@ -884,12 +983,64 @@ void MidiRollPlugin::StopAll()
 	midi_.AllNotesOff();
 	envelopes_.Reset();
 	envCcSent_[ 0 ] = envCcSent_[ 1 ] = envCcSent_[ 2 ] = envCcSent_[ 3 ] = -1;
-	env1OscSent_ = -1.0f;
+	envOscSent_[ 0 ] = envOscSent_[ 1 ] = envOscSent_[ 2 ] = envOscSent_[ 3 ] = -1.0f;
 }
 
 // ---------------------------------------------------------------------------
 // Outputs
 // ---------------------------------------------------------------------------
+
+void MidiRollPlugin::ApplyOscAddresses( int layer, int column, bool layerOnly )
+{
+	std::string base;
+
+	if( layer <= 0 )
+		base = "/composition/dashboard/link";
+	else if( layerOnly )
+		base = "/composition/layers/" + std::to_string( layer ) + "/dashboard/link";
+	else
+		base = "/composition/layers/" + std::to_string( layer ) + "/clips/" + std::to_string( column ) + "/dashboard/link";
+
+	{
+		std::lock_guard< std::mutex > lock( oscMutex_ );
+		for( int lane = 0; lane < kLanes; ++lane )
+			envOscAddress_[ lane ] = base + std::to_string( lane + 1 );
+	}
+
+	resetOscSent_.store( true );
+	oscAddressDirty_.store( true );
+	confirmOverwrite_.store( false );
+	confirmDirty_.store( true );
+}
+
+bool MidiRollPlugin::ShouldOverwriteOsc()
+{
+	if( confirmOverwrite_.load() )
+		return true;
+
+	bool custom = false;
+
+	{
+		std::lock_guard< std::mutex > lock( oscMutex_ );
+		for( int lane = 0; lane < kLanes; ++lane )
+		{
+			const std::string def = "/composition/selectedclip/dashboard/link" + std::to_string( lane + 1 );
+			if( !envOscAddress_[ lane ].empty() && envOscAddress_[ lane ] != def )
+			{
+				custom = true;
+				break;
+			}
+		}
+	}
+
+	if( custom )
+	{
+		FFGLLog::LogToHost( "OSC addresses are already set; tick Allow Overwrite to replace them" );
+		return false;
+	}
+
+	return true;
+}
 
 void MidiRollPlugin::PushEnvelopeParams()
 {
@@ -917,15 +1068,21 @@ void MidiRollPlugin::PushEnvelopeParams()
 			}
 		}
 
-		if( lane == 0 && env1Dial_ >= 0 && osc_.IsOpen() )
+		if( oscEnabled_[ lane ].load() && osc_.IsOpen() )
 		{
-			if( std::fabs( value - env1OscSent_ ) > 0.002f )
+			if( std::fabs( value - envOscSent_[ lane ] ) > 0.002f )
 			{
-				env1OscSent_ = value;
+				std::string address;
+				{
+					std::lock_guard< std::mutex > lock( oscMutex_ );
+					address = envOscAddress_[ lane ];
+				}
 
-				char address[ 64 ] = {};
-				std::snprintf( address, sizeof( address ), "/composition/dashboard/link%d", env1Dial_ + 1 );
-				osc_.SendFloat( address, value );
+				if( !address.empty() )
+				{
+					envOscSent_[ lane ] = value;
+					osc_.SendFloat( address.c_str(), value );
+				}
 			}
 		}
 	}
@@ -1985,16 +2142,6 @@ std::string MidiRollPlugin::BuildNotesJson() const
 
 	out += "]}";
 	return out;
-}
-
-void MidiRollPlugin::PublishNotes()
-{
-	// A clip that only uses the legacy Pattern has no JSON to update.
-	if( noteCount_ == 0 && notesText_.find( '{' ) == std::string::npos )
-		return;
-
-	notesText_ = BuildNotesJson();
-	RaiseParamEvent( PT_NOTES, FF_EVENT_FLAG_VALUE );
 }
 
 void MidiRollPlugin::PollBridge( float deltaSeconds )

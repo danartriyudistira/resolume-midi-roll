@@ -5,8 +5,11 @@
 #include "EnvelopeEngine.h"
 #include "MidiOut.h"
 #include "OscOut.h"
+#include "OscTargetResolver.h"
 
+#include <atomic>
 #include <chrono>
+#include <mutex>
 #include <string>
 
 // Midi Roll
@@ -45,33 +48,51 @@ public:
 private:
 	enum ParamId : unsigned int
 	{
+		// Top group: MIDI out + generator.
 		PT_PORT = 0,
 		PT_CHANNEL,
-		PT_LENGTH,
-		PT_DECAY,
-		PT_EDIT_MODE,
-		PT_ENV1,
-		PT_ENV1_DIAL,
-		PT_ENV2,
-		PT_ENV3,
-		PT_ENV4,
-		PT_PATTERN,
-		PT_NOTES,
 		PT_OFFSET,
-		// Appended after the original parameters so existing presets keep their
-		// parameter indices.
+		PT_EDIT_MODE,
 		PT_ROOT,
 		PT_SCALE,
 		PT_GENRE,
 		PT_TEMPLATE,
-		PT_LOAD_TEMPLATE,
-		PT_RANDOM_TEMPLATE,
 		PT_BARS_GEN,
 		PT_PROGRESSION,
 		PT_DENSITY,
 		PT_LOAD_V2,
 		PT_RANDOM_V2,
 		PT_PREVIOUS,
+
+		// Bottom group: envelope output control.
+		PT_DECAY,
+		PT_ENV1,
+		PT_ENV1_OSC,
+		PT_OSC1_ENABLE,
+		PT_ENV2,
+		PT_ENV2_OSC,
+		PT_OSC2_ENABLE,
+		PT_ENV3,
+		PT_ENV3_OSC,
+		PT_OSC3_ENABLE,
+		PT_ENV4,
+		PT_ENV4_OSC,
+		PT_OSC4_ENABLE,
+
+		// OSC target helpers.
+		PT_CONFIRM_OVERWRITE,
+		PT_SET_OSC_CLIP,
+		PT_SET_OSC_COMPOSITION,
+		PT_SET_OSC_LAYER,
+
+		// Kept visible because the web editor reads and writes Notes by name.
+		PT_NOTES,
+
+		// Hidden legacy parameters, kept for preset compatibility.
+		PT_LENGTH,
+		PT_PATTERN,
+		PT_LOAD_TEMPLATE,
+		PT_RANDOM_TEMPLATE,
 		PT_COUNT
 	};
 
@@ -95,7 +116,6 @@ private:
 	struct PendingNoteOff
 	{
 		int note;
-		int lane;
 		int channel;
 		float remaining;
 	};
@@ -103,7 +123,7 @@ private:
 	void DriveSequencer( float deltaSeconds );
 	float CurrentPhase() const;
 	void FireStep( int step, float stepSeconds );
-	void ScheduleNoteOff( int note, int lane, float delaySeconds, int channel );
+	void ScheduleNoteOff( int note, float delaySeconds, int channel );
 	void FlushNoteOffs( float deltaSeconds );
 	void PushEnvelopeParams();
 	void OpenConfiguredPort();
@@ -123,7 +143,6 @@ private:
 
 	// Piano roll state mirrored into Resolume parameters.
 	std::string BuildNotesJson() const;
-	void PublishNotes();
 
 	// Scale degree -> MIDI pitch. Octave 4 is the melody range, 2 the bass.
 	int ScalePitch( int degree, int octave ) const;
@@ -160,6 +179,7 @@ private:
 	midiroll::EnvelopeEngine envelopes_;
 	midiroll::MidiOut midi_;
 	midiroll::OscOut osc_;
+	midiroll::OscTargetResolver oscResolver_;
 
 	// --- Host transport ----------------------------------------------------
 	double hostTime_         = 0.0;
@@ -211,9 +231,24 @@ private:
 	float envPushed_[ kLanes ] = {};
 	int envCcSent_[ kLanes ]   = { -1, -1, -1, -1 };
 
-	// -1 = Off, 0..7 = composition dashboard dial link1..link8.
-	int env1Dial_              = -1;
-	float env1OscSent_         = -1.0f;
+	// Per-envelope OSC destinations, e.g. /composition/selectedclip/dashboard/link1.
+	std::string envOscAddress_[ kLanes ] = {
+		"/composition/selectedclip/dashboard/link1",
+		"/composition/selectedclip/dashboard/link2",
+		"/composition/selectedclip/dashboard/link3",
+		"/composition/selectedclip/dashboard/link4",
+	};
+	std::atomic< bool > oscEnabled_[ kLanes ] = { true, true, true, true };
+	float envOscSent_[ kLanes ] = { -1.0f, -1.0f, -1.0f, -1.0f };
+
+	std::mutex oscMutex_;
+	std::atomic< bool > oscAddressDirty_ = false;
+	std::atomic< bool > resetOscSent_ = false;
+	std::atomic< bool > confirmDirty_ = false;
+	std::atomic< bool > confirmOverwrite_ = false;
+
+	void ApplyOscAddresses( int layer, int column, bool layerOnly );
+	bool ShouldOverwriteOsc();
 
 	float pattern_[ kLanes ][ kMaxSteps ] = {};
 

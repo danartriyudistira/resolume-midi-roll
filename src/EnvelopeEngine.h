@@ -12,19 +12,16 @@ namespace midiroll
 		EnvelopeEngine();
 
 		void Trigger( int lane, float velocity, float decaySeconds );
-		void Release( int lane );
 		void Advance( float deltaSeconds );
 		void Reset();
 
 		float Value( int lane ) const;
-		bool IsActive( int lane ) const;
 
 	private:
 		struct Lane
 		{
 			float value     = 0.0f;
 			float decayTau  = 0.2f;
-			int activeNotes = 0;
 		};
 
 		Lane lanes_[ kLanes ];

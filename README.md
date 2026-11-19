@@ -230,9 +230,8 @@ bawaan: genre 0 Techno, 1 House, 2 Trance, 3 Drum & Bass, 4 Hip-Hop; template
 `--scale N` (0–5), `--bars N` (1–8), `--progression "A D A G"`, dan
 `--density N` (0–1) menguji nada dasar, scale, panjang, progresi, dan kepadatan.
 Tambahkan `--random` untuk variasi acak terkendali, `--previous` untuk menguji
-tombol Previous, dan `--env1-dial N` (0 = Off, 1–8 = Dial) untuk menguji OSC
-dashboard. Harness mencetak `Root/Scale`, `Bars/Density`, `Progression`, dan
-`Notes`.
+tombol Previous, dan `--env1-osc "<alamat>"` untuk menguji alamat OSC Env 1.
+Harness mencetak `Root/Scale`, `Bars/Density`, `Progression`, dan `Notes`.
 
 ## Peta parameter
 
@@ -240,39 +239,78 @@ dashboard. Harness mencetak `Root/Scale`, `Bars/Density`, `Progression`, dan
 |---|---|---|---|
 | 0 | Midi Port | option | dropdown `Off` + semua output MIDI saat plugin dimuat |
 | 1 | Midi Channel | option | 1–16, per instance |
-| 2 | Grid | option | **disembunyikan** dari panel; disimpan untuk kompatibilitas preset |
-| 3 | Decay | standard | 0.05–3.0 detik |
-| 4 | Edit Mode | event | buka piano roll di browser |
-| 5 | Env 1 | standard | keluaran; lane aktif mengikuti note yang di-fold |
-| 6 | Env 1 Dial | option | `Off` atau `Dial 1`–`Dial 8` (composition dashboard, via OSC) |
-| 7–9 | Env 2..4 | standard | keluaran; lane aktif mengikuti note yang di-fold |
-| 10 | Pattern | text | 128 karakter, pola 4 lane lama (fallback) |
-| 11 | Notes | text | JSON daftar note dari piano roll |
-| 12 | Midi Offset | standard | kompensasi latency −80…+80 ms, 0.5 = netral |
-| 13 | Root | option | `C` … `B` — nada dasar untuk bass/melodi |
-| 14 | Scale | option | `Major`, `Natural Minor`, `Dorian`, `Mixolydian`, `Pentatonic Minor`, `Pentatonic Major` |
-| 15 | Genre | option | `Techno`, `House`, `Trance`, `Drum & Bass`, `Hip-Hop` |
-| 16 | Template | option | `Empty`, `Drums`, `Bassline`, `Melody`, `Full Groove` |
-| 17 | Load Template | event | **disembunyikan**; digantikan `Load` #22 (disimpan untuk kompatibilitas preset) |
-| 18 | Random | event | **disembunyikan**; digantikan `Random` #23 (disimpan untuk kompatibilitas preset) |
-| 19 | Bars | option | 1–8 bar untuk pola yang dihasilkan (default 1) |
-| 20 | Progression | text | root/kualitas chord per bar, mis. `Am Dm A G` |
-| 21 | Density | standard | 0–1, kepadatan Random (default 0.5) |
-| 22 | Load | event | memuat template + menyimpan snapshot ke history |
-| 23 | Random | event | variasi acak + menyimpan snapshot ke history |
-| 24 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
+| 2 | Midi Offset | standard | kompensasi latency −80…+80 ms, 0.5 = netral |
+| 3 | Edit Mode | event | buka piano roll di browser |
+| 4 | Root | option | `C` … `B` — nada dasar untuk bass/melodi |
+| 5 | Scale | option | `Major`, `Natural Minor`, `Dorian`, `Mixolydian`, `Pentatonic Minor`, `Pentatonic Major` |
+| 6 | Genre | option | `Techno`, `House`, `Trance`, `Drum & Bass`, `Hip-Hop` |
+| 7 | Template | option | `Empty`, `Drums`, `Bassline`, `Melody`, `Full Groove` |
+| 8 | Bars | option | 1–8 bar untuk pola yang dihasilkan (default 1) |
+| 9 | Progression | text | root/kualitas chord per bar, mis. `Am Dm A G` |
+| 10 | Density | standard | 0–1, kepadatan Random (default 0.5) |
+| 11 | Load | event | memuat template + menyimpan snapshot ke history |
+| 12 | Random | event | variasi acak + menyimpan snapshot ke history |
+| 13 | Previous | event | kembali ke pola sebelum Load/Random (riwayat 8 langkah) |
+| 14 | Decay | standard | 0.05–3.0 detik |
+| 15 | Env 1 | standard | keluaran; lane aktif mengikuti note yang di-fold |
+| 16 | Env 1 OSC | text | alamat OSC, default `/composition/selectedclip/dashboard/link1` |
+| 17 | OSC 1 Enable | boolean | centang untuk mengaktifkan OSC Env 1 |
+| 18 | Env 2 | standard | keluaran |
+| 19 | Env 2 OSC | text | default `/composition/selectedclip/dashboard/link2` |
+| 20 | OSC 2 Enable | boolean | centang untuk mengaktifkan OSC Env 2 |
+| 21 | Env 3 | standard | keluaran |
+| 22 | Env 3 OSC | text | default `/composition/selectedclip/dashboard/link3` |
+| 23 | OSC 3 Enable | boolean | centang untuk mengaktifkan OSC Env 3 |
+| 24 | Env 4 | standard | keluaran |
+| 25 | Env 4 OSC | text | default `/composition/selectedclip/dashboard/link4` |
+| 26 | OSC 4 Enable | boolean | centang untuk mengaktifkan OSC Env 4 |
+| 27 | Allow Overwrite | boolean | izinkan tombol OSC mengganti alamat yang sudah ada |
+| 28 | OSC from Clip | event | isi alamat dari clip yang selected |
+| 29 | OSC Composition | event | isi alamat composition dashboard |
+| 30 | OSC Layer | event | isi alamat layer dari clip yang selected |
+| 31 | Notes | text | JSON daftar note; dipakai web editor |
+
+Legacy yang disembunyikan: `Grid` (32), `Pattern` (33), `Load Template` (34),
+`Random Template` (35).
 
 ### Panel Resolume
 
-Urutan panel mengikuti alur live: **Midi Port** (dropdown), **Midi Channel**,
-**Decay**, **Edit Mode**, **Env 1**, **Env 1 Dial**, **Env 2**, **Env 3**,
-**Env 4**, **Pattern**, **Notes**, **Midi Offset**, **Root**, **Scale**,
-**Genre**, **Template**, **Bars**, **Progression**, **Density**, **Load**,
-**Random**, **Previous**.
+**Grup atas — MIDI out & generator:**
 
-`Load Template` dan `Random` lama (index 16–17) disembunyikan dari panel tetapi
-tetap ada agar preset lama tidak bergeser. Tombol yang dipakai sekarang adalah
-**Load** (21), **Random** (22), dan **Previous** (23) di bagian bawah.
+`Midi Port`, `Midi Channel`, `Midi Offset`, `Edit Mode`, `Root`, `Scale`,
+`Genre`, `Template`, `Bars`, `Progression`, `Density`, `Load`, `Random`,
+`Previous`.
+
+**Grup bawah — kontrol output Env:**
+
+`Decay`, lalu untuk tiap Env: `Env 1` → `Env 1 OSC` → `OSC 1 Enable`,
+`Env 2` → `Env 2 OSC` → `OSC 2 Enable`, dan seterusnya sampai Env 4.
+Setelah `OSC 4 Enable`: `Allow Overwrite`, `OSC from Clip`,
+`OSC Composition`, `OSC Layer`.
+
+`Notes` ada di paling bawah.
+
+### Alamat OSC otomatis
+
+Tombol di panel:
+
+| Tombol | Hasil |
+|---|---|
+| `OSC from Clip` | `/composition/layers/{L}/clips/{C}/dashboard/linkN` |
+| `OSC Composition` | `/composition/dashboard/linkN` |
+| `OSC Layer` | `/composition/layers/{L}/dashboard/linkN` |
+
+`{L}` dan `{C}` diambil dari **clip yang selected** di Resolume. Clip harus
+mengandung effect **Midi Roll**; kalau tidak, alamat tidak diubah dan plugin
+menulis log.
+
+Kalau alamat sudah pernah diisi (bukan default `selectedclip`), tombol menolak
+mengganti. Centang **Allow Overwrite** dulu, lalu tekan tombol. Setelah berhasil,
+centang otomatis dilepas lagi.
+
+Butuh **Webserver Resolume** aktif di `127.0.0.1:8080` (sama seperti web editor).
+Tombol `OSC Layer` memakai layer dari clip yang selected, bukan layer yang
+sedang dipilih di UI.
 
 Midi Port dirender sebagai dropdown karena daftar elemennya diberi pemisah
 (`AddElementSeparator`): `Off` di atas, lalu daftar device MIDI. Tanpa pemisah,
@@ -441,24 +479,39 @@ diedit di web lewat **Edit Mode**.
 
 ### Env 1 → Dashboard (OSC)
 
-`Env 1 Dial` berada tepat di bawah **Env 1** dan di atas **Env 2**. Menu ini
-memilih rotary **Composition Dashboard** yang digerakkan Env 1 lewat **OSC**,
-bukan MIDI.
+`Env 1 OSC` berada tepat di bawah **Env 1** dan di atas **Env 2**. Isinya adalah
+**alamat OSC manual** yang digerakkan Env 1, bukan MIDI.
+
+Default:
+
+```
+/composition/selectedclip/dashboard/link1
+```
+
+Alamat lain yang bisa dipakai:
+
+```
+/composition/dashboard/link1
+/composition/layers/1/dashboard/link1
+/composition/layers/1/clips/1/dashboard/link1
+```
 
 1. Resolume → **Preferences → OSC** → aktifkan **OSC Input** (port **7000**).
-2. Di Midi Roll, set `Env 1 Dial = Dial 1` … `Dial 8`.
-3. Buka **Composition Dashboard**, drag parameter warna ke rotary yang sama.
-4. Play clip. Env 1 menggerakkan rotary tersebut.
+2. Di Midi Roll, isi `Env 1 OSC` dengan alamat tujuan.
+3. Centang **OSC Enable** untuk mengaktifkan pengiriman.
+4. Buka dashboard yang sesuai dan link parameter warna ke rotary tersebut.
+5. Play clip. Env 1 menggerakkan rotary di alamat itu.
 
-Plugin mengirim `/composition/dashboard/linkN` setiap nilai Env 1 berubah.
-Tidak ada MIDI learn atau Shortcut Preset untuk jalur ini.
+Plugin mengirim nilai Env 1 ke alamat tersebut setiap nilainya berubah.
+Hilangkan centang **OSC Enable** untuk mematikan OSC tanpa menghapus alamatnya.
+Kosongkan field alamat untuk mematikan juga. Tidak ada MIDI learn atau Shortcut
+Preset untuk jalur ini.
 
 **Penting:** jangan drag parameter **Env 1** ke dashboard. Itu membuat dial
 mengontrol Env 1 (arah terbalik). Dial harus digerakkan oleh OSC dari plugin,
 lalu parameter warna di-link ke dial.
 
-Untuk Env 2–4, gunakan jalur MIDI CC di bawah; dropdown OSC bisa ditambahkan
-menyusul dengan pola yang sama.
+Untuk Env 2–4, gunakan jalur MIDI CC di bawah.
 
 ### Env sebagai penggerak Dashboard (CC)
 

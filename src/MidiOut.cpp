@@ -81,8 +81,7 @@ namespace midiroll
 		if( result != MMSYSERR_NOERROR || handle == nullptr )
 			return false;
 
-		handle_    = handle;
-		openIndex_ = deviceIndex;
+		handle_ = handle;
 		return true;
 	}
 
@@ -95,18 +94,12 @@ namespace midiroll
 		midiOutReset( static_cast< HMIDIOUT >( handle_ ) );
 		midiOutClose( static_cast< HMIDIOUT >( handle_ ) );
 
-		handle_    = nullptr;
-		openIndex_ = -1;
+		handle_ = nullptr;
 	}
 
 	bool MidiOut::IsOpen() const
 	{
 		return handle_ != nullptr;
-	}
-
-	int MidiOut::OpenIndex() const
-	{
-		return openIndex_;
 	}
 
 	void MidiOut::SendShort( int status, int data1, int data2 )

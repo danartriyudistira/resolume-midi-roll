@@ -12,7 +12,6 @@ namespace midiroll
 		constexpr float kDecayShape = 3.0f;
 		constexpr float kMinTau     = 0.005f;
 		constexpr float kEpsilon    = 0.0005f;
-		constexpr int kMaxStack     = 16;
 	}
 
 	EnvelopeEngine::EnvelopeEngine()
@@ -34,19 +33,6 @@ namespace midiroll
 		// rapid note repeats from stuttering the value the host is reading.
 		if( velocity > l.value )
 			l.value = velocity;
-
-		if( l.activeNotes < kMaxStack )
-			++l.activeNotes;
-	}
-
-	void EnvelopeEngine::Release( int lane )
-	{
-		if( lane < 0 || lane >= kLanes )
-			return;
-
-		Lane& l = lanes_[ lane ];
-		if( l.activeNotes > 0 )
-			--l.activeNotes;
 	}
 
 	void EnvelopeEngine::Advance( float deltaSeconds )
@@ -75,7 +61,6 @@ namespace midiroll
 		{
 			l.value       = 0.0f;
 			l.decayTau    = 0.2f;
-			l.activeNotes = 0;
 		}
 	}
 
@@ -85,13 +70,5 @@ namespace midiroll
 			return 0.0f;
 
 		return lanes_[ lane ].value;
-	}
-
-	bool EnvelopeEngine::IsActive( int lane ) const
-	{
-		if( lane < 0 || lane >= kLanes )
-			return false;
-
-		return lanes_[ lane ].activeNotes > 0;
 	}
 }

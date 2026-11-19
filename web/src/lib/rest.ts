@@ -57,7 +57,10 @@ function parse(data: any): CompositionInfo {
   const layers = (data.layers ?? []).map((layer: any, layerIndex: number) => ({
     name: layer.name?.value ?? "",
     clips: (layer.clips ?? []).map((clip: any, clipIndex: number) => {
-      const effect = (clip.video?.effects ?? []).find((entry: any) => entry.name === "Midi Roll");
+      // Find by a stable parameter name: the effect itself may be renamed.
+      const effect = (clip.video?.effects ?? []).find(
+        (entry: any) => entry.params?.Notes && entry.params?.["Env 1 OSC"],
+      );
       const params = effect?.params ?? {};
 
       return {
